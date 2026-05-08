@@ -55,17 +55,19 @@ def getWindowCoords(frame):
     
 
 from PreProcessing import preProcessing
-from SMB4_OCR import scheduleOCR
+from SMB4_OCR import batterStatsOCR, scheduleOCR
 from DetectRowCount import detectRowCount
 
 
 
-videoPathBaseStats = r"C:\Users\aidan\OneDrive\Desktop\SMB4-Data-Parser\SMB4_Stats_Test.mp4"
+videoPathBaseStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsBaseTestCase.mp4"
+videoPathExtremeStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsExtremeTestCase.mp4"
 test9Rows = capFrame(videoPathBaseStats, 3)
 test14Rows = capFrame(videoPathBaseStats, 6)
 test20Rows = capFrame(videoPathBaseStats)
 test21Rows = capFrame(videoPathBaseStats, 11)
 test22Rows = capFrame(videoPathBaseStats, 28)
+testExtremeStats = capFrame(videoPathExtremeStats, 31)
 #getWindowCoords(test21Rows)
 
 print("Number of rows detected in 9 row case:", detectRowCount(test9Rows))
@@ -73,6 +75,15 @@ print("Number of rows detected in 14 row case:", detectRowCount(test14Rows))
 print("Number of rows detected in 20 row case:", detectRowCount(test20Rows))
 print("Number of rows detected in 21 row case:", detectRowCount(test21Rows))
 print("Number of rows detected in 22 row case:", detectRowCount(test22Rows))
+print("Number of rows detected in extreme stats case:", detectRowCount(testExtremeStats))
+
+
+import pandas as pd
+pdDF = pd.DataFrame(batterStatsOCR(test20Rows))
+pdDF.to_excel("ocr_output.xlsx", index=False)
+
+
+
 # getWindowCoords(test20Rows)   
 
 # videoPathBase = "SMB4_Schedule_Test.mp4"

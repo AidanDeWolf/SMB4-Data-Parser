@@ -95,13 +95,16 @@ def scheduleOCR(frame):
 def batterStatsOCR(frame):
     import pytesseract
     import cv2
+    from DetectRowCount import detectRowCount
+    from PreProcessing import preProcessing
+
     print(f"---Running Batting Stats OCR---")
     battingStats = []
 
 
-    yvalues = [317, 350, 383, 416, 449, 482, 515, 548, 581, 614, 647, 680, 713, 746, 779, 812, 845, 878, 911, 944, 977, 1010] #pixel values of the center of the 22 relevant rows
-    xvalues = [163,391,461,531,601,671,1030,1100,1170,1240,1310,1380,1450,1520,1590,1660,1730,1800] #pixel values of center of the 18 relevant columns
-    name_x_Buffer = 115
+    yvalues = [317, 350, 382, 414, 446, 478, 511, 543, 575, 606, 638, 670, 702, 734, 766, 799, 831, 863, 895, 927, 959, 991] #pixel values of the center of the 22 relevant rows
+    xvalues = [164, 390, 461, 531, 601, 672, 1028, 1100, 1171, 1241, 1312, 1382, 1453, 1523, 1594, 1664, 1734, 1804] #pixel values of center of the 18 relevant columns
+    name_x_Buffer = 116
     games_xBuffer = 32
     atBat_xBuffer = 35
     hits_xBuffer = 35
@@ -122,12 +125,310 @@ def batterStatsOCR(frame):
     yBuffer = 16
 
 
-    nameConfig = "--psm 7"
+    nameConfig = "--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz. " #Added period and space to whitelist for cases like "J. Doe" or "J Doe"
     intConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
     rowCount = detectRowCount(frame)
-    for yvalue in range(rowCount):
-        False
 
+    # debugFrame = frame.copy()
+    # for yvalue in yvalues[:rowCount]:
+    #     #Debug
+    #     cv2.rectangle(debugFrame,
+    #           (xvalues[0] - name_x_Buffer, yvalue - yBuffer),
+    #           (xvalues[0] + name_x_Buffer, yvalue + yBuffer),
+    #           (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[1] - games_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[1] + games_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[2] - atBat_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[2] + atBat_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[3] - hits_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[3] + hits_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[4] - hr_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[4] + hr_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[5] - rbi_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[5] + rbi_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[6] - runs_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[6] + runs_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[7] - totalBases_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[7] + totalBases_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[8] - doubles_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[8] + doubles_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[9] - triples_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[9] + triples_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[10] - walks_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[10] + walks_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[11] - battingK_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[11] + battingK_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[12] - sb_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[12] + sb_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[13] - cs_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[13] + cs_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[14] - hbp_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[14] + hbp_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[15] - sac_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[15] + sac_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[16] - sf_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[16] + sf_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+
+    #     cv2.rectangle(debugFrame,
+    #                 (xvalues[17] - error_xBuffer, yvalue - yBuffer),
+    #                 (xvalues[17] + error_xBuffer, yvalue + yBuffer),
+    #                 (0, 255, 0), 1)
+    # cv2.imshow("Debug Frame", debugFrame)
+
+
+    for yvalue in yvalues[:rowCount]:
+    
+        nameROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[0] - name_x_Buffer : xvalues[0] + name_x_Buffer
+        ]
+        nameROI = preProcessing(nameROI)
+        name = pytesseract.image_to_string(
+            nameROI,
+            config=nameConfig
+        ).strip()
+
+        gamesROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[1] - games_xBuffer : xvalues[1] + games_xBuffer
+        ]
+        gamesROI = preProcessing(gamesROI, type="number")
+        games = pytesseract.image_to_string(
+            gamesROI,
+            config=intConfig
+        ).strip()
+
+        atBatROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[2] - atBat_xBuffer : xvalues[2] + atBat_xBuffer
+        ]
+        atBatROI = preProcessing(atBatROI, type="number")
+        atBats = pytesseract.image_to_string(
+            atBatROI,
+            config=intConfig
+        ).strip()
+
+        hitsROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[3] - hits_xBuffer : xvalues[3] + hits_xBuffer
+        ]
+        hitsROI = preProcessing(hitsROI, type="number")
+        hits = pytesseract.image_to_string(
+            hitsROI,
+            config=intConfig
+        ).strip()
+
+        hrROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[4] - hr_xBuffer : xvalues[4] + hr_xBuffer
+        ]
+        hrROI = preProcessing(hrROI, type="number")
+        homeRuns = pytesseract.image_to_string(
+            hrROI,
+            config=intConfig
+        ).strip()
+
+        rbiROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[5] - rbi_xBuffer : xvalues[5] + rbi_xBuffer
+        ]
+        rbiROI = preProcessing(rbiROI, type="number")
+        rbi = pytesseract.image_to_string(
+            rbiROI,
+            config=intConfig
+        ).strip()
+
+        runsROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[6] - runs_xBuffer : xvalues[6] + runs_xBuffer
+        ]
+        runsROI = preProcessing(runsROI, type="number")
+        runs = pytesseract.image_to_string(
+            runsROI,
+            config=intConfig
+        ).strip()
+
+        totalBasesROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[7] - totalBases_xBuffer : xvalues[7] + totalBases_xBuffer
+        ]
+        totalBasesROI = preProcessing(totalBasesROI, type="number")
+        totalBases = pytesseract.image_to_string(
+            totalBasesROI,
+            config=intConfig
+        ).strip()
+
+        doublesROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[8] - doubles_xBuffer : xvalues[8] + doubles_xBuffer
+        ]
+        doublesROI = preProcessing(doublesROI, type="number")
+        doubles = pytesseract.image_to_string(
+            doublesROI,
+            config=intConfig
+        ).strip()
+
+        triplesROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[9] - triples_xBuffer : xvalues[9] + triples_xBuffer
+        ]
+        triplesROI = preProcessing(triplesROI, type="number")
+        triples = pytesseract.image_to_string(
+            triplesROI,
+            config=intConfig
+        ).strip()
+
+        walksROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[10] - walks_xBuffer : xvalues[10] + walks_xBuffer
+        ]
+        walksROI = preProcessing(walksROI, type="number")
+        walks = pytesseract.image_to_string(
+            walksROI,
+            config=intConfig
+        ).strip()
+
+        battingKROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[11] - battingK_xBuffer : xvalues[11] + battingK_xBuffer
+        ]
+        battingKROI = preProcessing(battingKROI, type="number")
+        battingK = pytesseract.image_to_string(
+            battingKROI,
+            config=intConfig
+        ).strip()
+
+        sbROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[12] - sb_xBuffer : xvalues[12] + sb_xBuffer
+        ]
+        sbROI = preProcessing(sbROI, type="number")
+        sb = pytesseract.image_to_string(
+            sbROI,
+            config=intConfig
+        ).strip()
+
+        csROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[13] - cs_xBuffer : xvalues[13] + cs_xBuffer
+        ]
+        csROI = preProcessing(csROI, type="number")
+        cs = pytesseract.image_to_string(
+            csROI,
+            config=intConfig
+        ).strip()
+
+        hbpROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[14] - hbp_xBuffer : xvalues[14] + hbp_xBuffer
+        ]
+        hbpROI = preProcessing(hbpROI, type="number")
+        hbp = pytesseract.image_to_string(
+            hbpROI,
+            config=intConfig
+        ).strip()
+
+        sacROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[15] - sac_xBuffer : xvalues[15] + sac_xBuffer
+        ]
+        sacROI = preProcessing(sacROI, type="number")
+        sac = pytesseract.image_to_string(
+            sacROI,
+            config=intConfig
+        ).strip()
+
+        sfROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[16] - sf_xBuffer : xvalues[16] + sf_xBuffer
+        ]
+        sfROI = preProcessing(sfROI, type="number")
+        sf = pytesseract.image_to_string(
+            sfROI,
+            config=intConfig
+        ).strip()
+
+        errorROI = frame[
+            yvalue - yBuffer : yvalue + yBuffer,
+            xvalues[17] - error_xBuffer : xvalues[17] + error_xBuffer
+        ]
+        errorROI = preProcessing(errorROI, type="number")
+        errors = pytesseract.image_to_string(
+            errorROI,
+            config=intConfig
+        ).strip()
+
+        battingStats.append({
+            "name": name,
+            "games": games,
+            "atBats": atBats,
+            "hits": hits,
+            "homeRuns": homeRuns,
+            "rbi": rbi,
+            "runs": runs,
+            "totalBases": totalBases,
+            "doubles": doubles,
+            "triples": triples,
+            "walks": walks,
+            "strikeouts": battingK,
+            "stolenBases": sb,
+            "caughtStealing": cs,
+            "hitByPitch": hbp,
+            "sacrificeHits": sac,
+            "sacrificeFlies": sf,
+            "errors": errors
+        })
+    
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
     return battingStats
 
 def pitcherStatsOCR(frame):
