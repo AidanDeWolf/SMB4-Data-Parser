@@ -1,16 +1,17 @@
 from statistics import mode
-
-import cv2 #?
+import cv2
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
 
+import os
+print("CWD:", os.getcwd())
+print("Script Started")
 
 
 
-
-
-def capFirstFrame(videoPath):
+def capFrame(videoPath, timestampSecs = 0):
     cap = cv2.VideoCapture(videoPath)
+    cap.set(cv2.CAP_PROP_POS_MSEC, timestampSecs * 1000)  # Set the position to the desired frame (in milliseconds)
     successRead, frame = cap.read()
     if not successRead:
         print(f"Failed to read video: {videoPath}")
@@ -47,44 +48,40 @@ def debugRow(frame, y, xvalues, buffers):
 
 
 
-def originalROIcode(frame):
-    frame = False   #Ignore, just so This can be closed
-    # Original hardcoded ROIs, not used in final code but kept for reference
-    # x1, y1, w1, h1 = 500, 225, 200, 720
-    # awayTeamROI = frame[y1:y1+h1, x1:x1+w1]
-
-    # x2, y2, w2, h2 = 995, 225, 200 , 720
-    # homeTeamROI = frame[y2:y2+h2, x2:x2+w2]
-
-    # x3, y3, w3, h3 = 795, 225, 55, 720
-    # awayScoreROI = frame[y3:y3+h3, x3:x3+w3]
-
-    # x4, y4, w4, h4 = 845, 225, 55, 720
-    # homeScoreROI = frame[y4:y4+h4, x4:x4+w4]
-
-    # x5, y5, w5, h5 = 155, 225, 120, 720
-    # gameNumberROI = frame[y5:y5+h5, x5:x5+w5]
-    exit()
-
 def getWindowCoords(frame):
     window = cv2.selectROI("Select ROI", frame, fromCenter=False, showCrosshair=True)
     print("Window coordinates:", window)
+    cv2.imshow("Selected Window", frame[int(window[1]):int(window[1]+window[3]), int(window[0]):int(window[0]+window[2])])
+    
 
 from PreProcessing import preProcessing
 from SMB4_OCR import scheduleOCR
-    
+from DetectRowCount import detectRowCount
 
 
 
+videoPathBaseStats = r"C:\Users\aidan\OneDrive\Desktop\SMB4-Data-Parser\SMB4_Stats_Test.mp4"
+test9Rows = capFrame(videoPathBaseStats, 3)
+test14Rows = capFrame(videoPathBaseStats, 6)
+test20Rows = capFrame(videoPathBaseStats)
+test21Rows = capFrame(videoPathBaseStats, 11)
+test22Rows = capFrame(videoPathBaseStats, 28)
+#getWindowCoords(test21Rows)
 
-videoPathBase = "SMB4_Schedule_Test.mp4"
-videoPathExtreme = "ScheduleExtremeTestCase.mp4"
-frameBase = capFirstFrame(videoPathBase)
-frameExtreme = capFirstFrame(videoPathExtreme)
+print("Number of rows detected in 9 row case:", detectRowCount(test9Rows))
+print("Number of rows detected in 14 row case:", detectRowCount(test14Rows))
+print("Number of rows detected in 20 row case:", detectRowCount(test20Rows))
+print("Number of rows detected in 21 row case:", detectRowCount(test21Rows))
+print("Number of rows detected in 22 row case:", detectRowCount(test22Rows))
+# getWindowCoords(test20Rows)   
 
-scheduleOCR(frame)
+# videoPathBase = "SMB4_Schedule_Test.mp4"
+# videoPathExtreme = "ScheduleExtremeTestCase.mp4"
+# frameBase = capFirstFrame(videoPathBase)
+# frameExtreme = capFirstFrame(videoPathExtreme)
+
+# scheduleOCR(frameBase)
 
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
-screenCap.release()

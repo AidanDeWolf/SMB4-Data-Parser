@@ -1,7 +1,8 @@
 #SMB4_OCR.py
 def scheduleOCR(frame):
     import pytesseract
-    print(f"---Running OCR---")
+    import cv2
+    print(f"---Running Schedule OCR---")
 
     yvalues = [251, 293, 335, 378, 419, 461, 503, 545, 587, 629, 671, 713, 754, 797, 839, 881, 923] #pixel values of the center of the 17 relevant rows
     xvalues = [210, 595, 818, 877, 1097] #pixel values of center of the 5 relevant columns
@@ -82,11 +83,79 @@ def scheduleOCR(frame):
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-        games.append([
-            gameNumber,
-            awayTeam,
-            homeTeam,
-            awayScore,
-            homeScore,
-        ])
-    return games   
+        games.append({
+            "gameNumber": gameNumber,
+            "awayTeam": awayTeam,
+            "homeTeam": homeTeam,
+            "awayScore": awayScore,
+            "homeScore": homeScore,
+        })  
+    return games
+
+def batterStatsOCR(frame):
+    import pytesseract
+    import cv2
+    print(f"---Running Batting Stats OCR---")
+    battingStats = []
+
+
+    yvalues = [317, 350, 383, 416, 449, 482, 515, 548, 581, 614, 647, 680, 713, 746, 779, 812, 845, 878, 911, 944, 977, 1010] #pixel values of the center of the 22 relevant rows
+    xvalues = [163,391,461,531,601,671,1030,1100,1170,1240,1310,1380,1450,1520,1590,1660,1730,1800] #pixel values of center of the 18 relevant columns
+    name_x_Buffer = 115
+    games_xBuffer = 32
+    atBat_xBuffer = 35
+    hits_xBuffer = 35
+    hr_xBuffer = 35
+    rbi_xBuffer = 35
+    runs_xBuffer = 35
+    totalBases_xBuffer = 35
+    doubles_xBuffer = 35
+    triples_xBuffer = 32
+    walks_xBuffer = 35
+    battingK_xBuffer = 35
+    sb_xBuffer = 35
+    cs_xBuffer = 35
+    hbp_xBuffer = 35
+    sac_xBuffer = 35
+    sf_xBuffer = 35
+    error_xBuffer = 35
+    yBuffer = 16
+
+
+    nameConfig = "--psm 7"
+    intConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
+    rowCount = detectRowCount(frame)
+    for yvalue in range(rowCount):
+        False
+
+    return battingStats
+
+def pitcherStatsOCR(frame):
+    import pytesseract
+    print(f"---Running OCR---")
+    pitchingStats = []
+    return pitchingStats
+
+def attFirstOCR(frame):
+    import pytesseract
+    print(f"---Running OCR---")
+    playersAtt1 = []
+    return playersAtt1
+
+def attSecondOCR(frame):
+    import pytesseract
+    print(f"---Running OCR---")
+    playersAtt2 = []
+    return playersAtt2
+
+def attThirdOCR(frame):
+    import pytesseract
+    print(f"---Running OCR---")
+    playersAtt3 = []
+    return playersAtt3
+
+def attFourthOCR(frame):
+    import pytesseract
+    print(f"---Running OCR---")
+    playersAtt4 = []
+    return playersAtt4
