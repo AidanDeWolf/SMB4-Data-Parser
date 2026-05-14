@@ -1,7 +1,7 @@
 #SMB4_OCR.py
 import cv2
 
-nameConfig = "--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz. "
+nameConfig = "--psm 7 -c preserve_inerword_spaces=1, tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz. "
 intConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
 teamNameConfig = "--psm 7"
 scoreConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
@@ -13,6 +13,7 @@ priPosConfig = "--psm 7 -c tessedit_char_whitelist=123BSFCLRSP/"
 secPosConfig = "--psm 7 -c tessedit_char_whitelist=123BSFCLRSPOI/"
 handConfig = "--psm 7 -c tessedit_char_whitelist=LRS"
 salaryConfig = "--psm 7 -c tessedit_char_whitelist=0123456789$m"
+intRetryConfig = "--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789"
 
 def debugOCRCell(roi, text, confidence, label):
     import pytesseract
@@ -39,44 +40,63 @@ def ocrNameCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=
 
 
 
-def ocrIntsWithConfidence(roi, config, minConfidence=20):
+def ocrIntsWithConfidence(roi, config, minConfidence=1):
     import pytesseract
     import cv2
-    data = pytesseract.image_to_data(
-        roi,
-        config=config,
-        output_type=pytesseract.Output.DICT
-    )
-    validTexts = []
-    validConfidences = []
+    def runOCR(roi, config):
+        data = pytesseract.image_to_data(
+            roi,
+            config=config,
+            output_type=pytesseract.Output.DICT
+        )
+        validTexts = []
+        validConfidences = []
 
-    for ocrIndex in range(len(data["text"])):
-        currentText = data["text"][ocrIndex].strip()
-        if currentText == "":
-            continue
-        confidence = int(data["conf"][ocrIndex])
+        for ocrIndex in range(len(data["text"])):
+            currentText = data["text"][ocrIndex].strip()
+            if currentText == "":
+                continue
+            confidence = int(data["conf"][ocrIndex])
+            validTexts.append(currentText)
+            validConfidences.append(confidence)
+        return validTexts, validConfidences
+    
+    validTexts, validConfidences = runOCR(roi, config = config)
 
+
+
+    if len(validTexts) == 0: #or max(validConfidences) <15:
+        roi2 = cv2.resize(roi, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+        roi2 = cv2.convertScaleAbs(roi2, alpha=1.6, beta=15)
+        roiInv = cv2.bitwise_not(roi2)
+        original = (validTexts, validConfidences)
+        second = runOCR(roi2, intRetryConfig)
+        inverted = runOCR(roiInv, intRetryConfig)
+        candidates = [original, second, inverted]
         
-        validTexts.append(currentText)
-        validConfidences.append(confidence)
-    reviewNeeded = False
+        def score(texts, confidences):
+            if len(texts) == 0:
+                return -1111
+            avgConf = sum(confidences) / len(confidences)
+            fragmentationPenalty = (-0.5) * (len(texts) - 1)
+            return (avgConf - fragmentationPenalty)
+        
+        validTexts, validConfidences = max(candidates, key=lambda x: score(x[0], x[1]))
 
     if len(validTexts) == 0:
-        reviewNeeded = True
         combinedText = ""
+        averageConfidence = -1
     elif len(validTexts) > 1:
-        reviewNeeded = True
         combinedText = "".join(validTexts)
     else:
         combinedText = validTexts[0]
     
     averageConfidence = (sum(validConfidences) / len(validConfidences) if len(validConfidences) > 0 else -1)
-    if averageConfidence < minConfidence:
-        reviewNeeded = True
+    reviewNeeded = (len(validTexts) == 0 or averageConfidence < minConfidence)
     
 
     if reviewNeeded:
-        combinedText = manualReview(roi, validTexts, validConfidences)        
+        combinedText = manualReview(roi, validTexts, validConfidences)    
     return combinedText, averageConfidence
 
 def ocrWordsWithConfidence(roi, config, minConfidence=20):
@@ -121,9 +141,9 @@ def ocrCell(roi, config, mode="int", minConfidence=20):
 
 def manualReview(roi, detectedTexts, confidences):
     import cv2
-    print("Manual Review Triggered:")
-    print(f"Detected OCR tokens: {detectedTexts}")
-    print(f"Confidences: {confidences}")
+    print()
+    print(f"Detected: {detectedTexts}")
+    print(f"Confidence: {confidences}")
     cv2.imshow("Review Needed", roi)
     cv2.waitKey(1)
     manual = input(f"Enter correct value:").strip()
@@ -235,16 +255,16 @@ def batterStatsOCR(frame):
     battingStats = []
 
 
-    yvalues = [317, 350, 382, 414, 446, 478, 511, 543, 575, 606, 638, 670, 702, 734, 766, 799, 831, 863, 895, 927, 959, 991] #pixel values of the center of the 22 relevant rows
+    yvalues = [318, 350, 382, 414, 446, 478, 511, 543, 575, 606, 638, 670, 702, 734, 766, 799, 831, 863, 895, 927, 959, 991] #pixel values of the center of the 22 relevant rows
     xValues = {"name": 164, "games": 390, "atBats": 461, "hits": 531, "homeRuns": 601, "rbi": 672, "runs": 1028, "totalBases": 1100, "doubles": 1171, "triples": 1241, "walks": 1312, "battingK": 1382, "sb": 1453, "cs": 1523, "hbp": 1594, "sac": 1664, "sf": 1734, "errors": 1804}
-    xBuffers = {"name": 116, "games": 32, "atBats": 35, "hits": 35, "homeRuns": 35, "rbi": 35, "runs": 35, "totalBases": 35, "doubles": 35, "triples": 32, "walks": 35, "battingK": 35, "sb": 35, "cs": 35, "hbp": 35, "sac": 35, "sf": 35, "errors": 35}
-    yBuffer = 19
+    xBuffers = {"name": 116, "games": 36, "atBats": 36, "hits": 36, "homeRuns": 36, "rbi": 36, "runs": 36, "totalBases": 36, "doubles": 36, "triples": 36, "walks": 36, "battingK": 36, "sb": 36, "cs": 36, "hbp": 36, "sac": 36, "sf": 36, "errors": 36}
+    yBuffer = 20
     rowCount = detectRowCount(frame)
 
     for yvalue in yvalues[:rowCount]:
     
         name, nameConfidence = ocrNameCell(frame, yvalue, xValues["name"], xBuffers["name"], yBuffer, nameConfig, preProcessType="name")
-        games, gamesConfidence = ocrStatCell(frame, yvalue, xValues["games"], xBuffers["games"], yBuffer, gameConfig, preProcessType="number")
+        games, gamesConfidence = ocrStatCell(frame, yvalue, xValues["games"], xBuffers["games"], yBuffer, intConfig, preProcessType="number")
         atBats, atBatsConfidence = ocrStatCell(frame, yvalue, xValues["atBats"], xBuffers["atBats"], yBuffer, intConfig, preProcessType="number")
         hits, hitsConfidence = ocrStatCell(frame, yvalue, xValues["hits"], xBuffers["hits"], yBuffer, intConfig, preProcessType="number")
         homeRuns, homeRunsConfidence = ocrStatCell(frame, yvalue, xValues["homeRuns"], xBuffers["homeRuns"], yBuffer, intConfig, preProcessType="number")

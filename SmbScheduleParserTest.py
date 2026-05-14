@@ -79,9 +79,13 @@ print("Number of rows detected in extreme stats case:", detectRowCount(testExtre
 
 
 import pandas as pd
-pdDF = pd.DataFrame(batterStatsOCR(test20Rows))
-print(pdDF)
-# pdDF.to_excel("ocr_output.xlsx", index=False)
+pdDF20 = pd.DataFrame(batterStatsOCR(test20Rows))
+pdDF21 = pd.DataFrame(batterStatsOCR(test21Rows))
+pdDF22 = pd.DataFrame(batterStatsOCR(test22Rows))
+
+
+
+
 
 
 
