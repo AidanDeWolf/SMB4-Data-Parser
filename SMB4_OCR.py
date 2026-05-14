@@ -3,6 +3,7 @@ import cv2
 
 nameConfig = "--psm 7 -c preserve_inerword_spaces=1, tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz. "
 intConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
+inningsConfig = "--psm 7 -c tessedit_char_whitelist=0123456789."
 teamNameConfig = "--psm 7"
 scoreConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
 gameConfig = "--psm 7 -c tessedit_char_whitelist=0123456789#"
@@ -154,6 +155,92 @@ def manualReview(roi, detectedTexts, confidences):
     else:
         return "".join(detectedTexts)
 
+def batStatsCheck(battingStats):
+    hits = battingStats["hits"]
+    atBats = battingStats["atBats"]
+    homeRuns = battingStats["homeRuns"]
+    doubles = battingStats["doubles"]
+    triples = battingStats["triples"]
+    totalBases = battingStats["totalBases"]
+    rbi = battingStats["rbi"]
+    runs = battingStats["runs"]
+    strikeouts = battingStats["strikeouts"]
+    batStatsNeedReview = False
+    
+    if (
+    hits > atBats
+    or homeRuns > hits
+    or doubles > hits
+    or triples > hits
+    or doubles + triples + homeRuns > hits
+    or totalBases < hits
+    or totalBases < (
+        (hits - doubles - triples - homeRuns)
+        + (2 * doubles)
+        + (3 * triples)
+        + (4 * homeRuns)
+    )
+    or rbi < homeRuns
+    or runs < homeRuns
+    or strikeouts > atBats
+):
+        batStatsNeedReview = True
+    battingStats.append(batStatsNeedReview)
+    return battingStats
+
+def pitchStatsCheck(pitchingStats):
+
+    wins = pitchingStats["wins"]
+    losses = pitchingStats["losses"]
+    runsAllowed = pitchingStats["runsAllowed"]
+    earnedRunsAllowed = pitchingStats["earnedRunsAllowed"]
+    gamesPitched = pitchingStats["gamesPitched"]
+    gamesStarted = pitchingStats["gamesStarted"]
+    saves = pitchingStats["saves"]
+    inningsPitched = pitchingStats["inningsPitched"]
+    hitsAllowed = pitchingStats["hitsAllowed"]
+    pitchingKs = pitchingStats["pitchingKs"]
+    walksAllowed = pitchingStats["walksAllowed"]
+    wildPitches = pitchingStats["wildPitches"]
+    homeRunsAllowed = pitchingStats["homeRunsAllowed"]
+    completeGames = pitchingStats["completeGames"]
+    shutouts = pitchingStats["shutouts"]
+    hitBatsmen = pitchingStats["hitBatsmen"]
+    battersFaced = pitchingStats["battersFaced"]
+    pitchesThrown = pitchingStats["pitchesThrown"]
+
+    pitchStatsNeedReview = False
+
+    if (
+        earnedRunsAllowed > runsAllowed
+        or gamesStarted > gamesPitched
+        or saves > gamesPitched
+        or completeGames > gamesStarted
+        or shutouts > completeGames
+        or homeRunsAllowed > hitsAllowed
+        or inningsPitched < 0
+        or wins > gamesPitched
+        or losses > gamesPitched
+        or wins + losses > gamesPitched
+        or pitchingKs > battersFaced
+        or walksAllowed > battersFaced
+        or hitsAllowed > battersFaced
+        or hitBatsmen > battersFaced
+        or pitchesThrown < battersFaced
+        or wildPitches > pitchesThrown
+        or inningsPitched > (gamesPitched * 9)
+        or battersFaced < (
+            hitsAllowed
+            + walksAllowed
+            + pitchingKs
+            + hitBatsmen
+        )
+    ):
+        pitchStatsNeedReview = True
+
+    pitchingStats.append(pitchStatsNeedReview)
+    return pitchingStats
+
 def scheduleOCR(frame):
     import pytesseract
     import cv2
@@ -246,10 +333,7 @@ def scheduleOCR(frame):
     return games
 
 def batterStatsOCR(frame):
-    import pytesseract
-    import cv2
     from DetectRowCount import detectRowCount
-    from PreProcessing import preProcessing
 
     print(f"---Running Batting Stats OCR---")
     battingStats = []
@@ -302,40 +386,71 @@ def batterStatsOCR(frame):
             "hitByPitch": hbp,
             "sacrificeHits": sac,
             "sacrificeFlies": sf,
-            "errors": errors
+            "errors": errors,
+            "passedBalls": ""
         })
-    
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        battingStats = batStatsCheck(battingStats)
+
+
     return battingStats
 
 def pitcherStatsOCR(frame):
-    import pytesseract
-    print(f"---Running OCR---")
+    from DetectRowCount import detectRowCount
+    print(f"---Running Pitching Stats OCR---")
     pitchingStats = []
+
+    yvalues = [318, 350, 382, 414, 446, 478, 511, 543, 575, 606, 638, 670, 702, 734, 766, 799, 831, 863, 895, 927, 959, 991] #pixel values of the center of the 22 relevant rows
+    xValues = {"name":  164, "wins": 387, "losses": 459, "runsAllowed": 602, "earnedRunsAllowed": 675, "gamesPitched": 813, "gamesStarted": 887, "saves": 957, "inningsPitched": 1026, "hitsAllowed": 1099, "pitchingKs": 1240, "walksAllowed": 1311, "wildPitches": 1383,"homeRunsAllowed": 1453, "completeGames": 1525, "shutouts": 1595, "hitBatsmen": 1666, "battersFaced": 1737, "pitchesThrown": 1809}
+    xBuffers = {"name": 116, "wins": 36, "losses": 36, "runsAllowed": 36, "earnedRunsAllowed": 36, "gamesPitched": 36, "gamesStarted": 36, "saves": 36, "inningsPitched": 40, "hitsAllowed": 36, "pitchingKs": 36, "walksAllowed": 36, "wildPitches": 36, "homeRunsAllowed": 36, "completeGames": 36, "shutouts": 36, "hitBatsmen": 36, "battersFaced":38, "pitchesThrown":42}
+    yBuffer = 20
+    rowCount = detectRowCount(frame)
+
+    for yvalue in yvalues[:rowCount]:
+        name, nameConfidence = ocrNameCell(frame, yvalue, xValues["name"], xBuffers["name"], yBuffer, nameConfig, preProcessType="name")
+        wins, winsConfidence = ocrStatCell(frame, yvalue, xValues["wins"], xBuffers["wins"], yBuffer, intConfig, preProcessType="number")
+        losses, lossesConfidence = ocrStatCell(frame, yvalue, xValues["losses"], xBuffers["losses"], yBuffer, intConfig, preProcessType="number")
+        runsAllowed, runsAllowedConfidence = ocrStatCell(frame, yvalue, xValues["runsAllowed"], xBuffers["runsAllowed"], yBuffer, intConfig, preProcessType="number")
+        earnedRunsAllowed, earnedRunsAllowedConfidence = ocrStatCell(frame, yvalue, xValues["earnedRunsAllowed"], xBuffers["earnedRunsAllowed"], yBuffer, intConfig, preProcessType="number")
+        gamesPitched, gamesPitchedConfidence = ocrStatCell(frame, yvalue, xValues["gamesPitched"], xBuffers["gamesPitched"], yBuffer, intConfig, preProcessType="number")
+        gamesStarted, gamesStartedConfidence = ocrStatCell(frame, yvalue, xValues["gamesStarted"], xBuffers["gamesStarted"], yBuffer, intConfig, preProcessType="number")
+        saves, savesConfidence = ocrStatCell(frame, yvalue, xValues["saves"], xBuffers["saves"], yBuffer, intConfig, preProcessType="number")
+        inningsPitched, inningsPitchedConfidence = ocrStatCell(frame, yvalue, xValues["inningsPitched"], xBuffers["inningsPitched"], yBuffer, inningsConfig, preProcessType="number")
+        hitsAllowed, hitsAllowedConfidence = ocrStatCell(frame, yvalue, xValues["hitsAllowed"], xBuffers["hitsAllowed"], yBuffer, intConfig, preProcessType="number")
+        pitchingKs, pitchingKsConfidence = ocrStatCell(frame,yvalue,xValues["pitchingKs"],xBuffers["pitchingKs"],yBuffer,intConfig ,preProcessType="number")
+        walksAllowed ,walksAllowedConfidence= ocrStatCell(frame,yvalue,xValues["walksAllowed"],xBuffers["walksAllowed"],yBuffer,intConfig ,preProcessType="number")
+        wildPitches ,wildPitchesConfidence= ocrStatCell(frame,yvalue,xValues["wildPitches"],xBuffers["wildPitches"],yBuffer,intConfig ,preProcessType="number")
+        homeRunsAllowed, homeRunsAllowedConfidence = ocrStatCell(frame,yvalue,xValues["homeRunsAllowed"],xBuffers["homeRunsAllowed"],yBuffer,intConfig ,preProcessType="number")
+        completeGames ,completeGamesConfidence= ocrStatCell(frame,yvalue,xValues["completeGames"],xBuffers["completeGames"],yBuffer,intConfig ,preProcessType="number")
+        shutouts ,shutoutsConfidence= ocrStatCell(frame,yvalue,xValues["shutouts"],xBuffers["shutouts"],yBuffer,intConfig ,preProcessType="number")
+        hitBatsmen ,hitBatsmenConfidence= ocrStatCell(frame,yvalue,xValues["hitBatsmen"],xBuffers["hitBatsmen"],yBuffer,intConfig ,preProcessType="number")
+        battersFaced ,battersFacedConfidence= ocrStatCell(frame,yvalue,xValues["battersFaced"],xBuffers["battersFaced"],yBuffer,intConfig ,preProcessType="number")
+        pitchesThrown ,pitchesThrownConfidence= ocrStatCell(frame,yvalue,xValues["pitchesThrown"],xBuffers["pitchesThrown"],yBuffer,intConfig ,preProcessType="number")
+
+        pitchingStats.append({
+            "name": name,
+            "wins": wins,
+            "losses": losses,
+            "runsAllowed": runsAllowed,
+            "earnedRunsAllowed": earnedRunsAllowed,
+            "gamesPitched": gamesPitched,
+            "gamesStarted": gamesStarted,
+            "saves": saves,
+            "inningsPitched": inningsPitched,
+            "hitsAllowed": hitsAllowed,
+            "pitchingKs": pitchingKs,
+            "walksAllowed": walksAllowed,
+            "wildPitches": wildPitches,
+            "homeRunsAllowed": homeRunsAllowed,
+            "completeGames": completeGames,
+            "shutouts": shutouts,
+            "hitBatsmen": hitBatsmen,
+            "battersFaced": battersFaced,
+            "pitchesThrown": pitchesThrown,
+        })
+        pitchStatsCheck(pitchingStats)
     return pitchingStats
 
-def attFirstOCR(frame):
-    import pytesseract
-    print(f"---Running OCR---")
-    playersAtt1 = []
-    return playersAtt1
-
-def attSecondOCR(frame):
-    import pytesseract
-    print(f"---Running OCR---")
-    playersAtt2 = []
-    return playersAtt2
-
-def attThirdOCR(frame):
-    import pytesseract
-    print(f"---Running OCR---")
-    playersAtt3 = []
-    return playersAtt3
-
-def attFourthOCR(frame):
-    import pytesseract
-    print(f"---Running OCR---")
-    playersAtt4 = []
-    return playersAtt4
+def rosterInfoOCR(pg1, pg2, pg3, pg4):
+    playerInfo = []
+    yValues = 
 
