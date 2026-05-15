@@ -24,30 +24,6 @@ def videoCapture(videoPath):
     return cap
 
 
-
-
-
-
-# This won't work because xvalues is not defined but can use this again if needed by defining xvalues and yvalues in this file or passing them as parameters, just a reference for now
-def debugRow(frame, y, xvalues, buffers):
-    yb = buffers["yBuffer"]
-
-    crops = {
-        "game": frame[y-yb:y+yb, xvalues[0]-buffers["game"]:xvalues[0]+buffers["game"]],
-        "awayTeam": frame[y-yb:y+yb, xvalues[1]-buffers["team"]:xvalues[1]+buffers["team"]],
-        "awayScore": frame[y-yb:y+yb, xvalues[2]-buffers["score"]:xvalues[2]+buffers["score"]],
-        "homeScore": frame[y-yb:y+yb, xvalues[3]-buffers["score"]:xvalues[3]+buffers["score"]],
-        "homeTeam": frame[y-yb:y+yb, xvalues[4]-buffers["team"]:xvalues[4]+buffers["team"]],
-    }
-
-    for name, img in crops.items():
-        cv2.imshow(name, img)
-
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
-
 def getWindowCoords(frame):
     window = cv2.selectROI("Select ROI", frame, fromCenter=False, showCrosshair=True)
     print("Window coordinates:", window)
@@ -55,30 +31,35 @@ def getWindowCoords(frame):
     
 
 from PreProcessing import preProcessing
-from SMB4_OCR import batterStatsOCR, pitcherStatsOCR, scheduleOCR
+from SMB4_OCR import batterStatsOCR, pitcherStatsOCR, scheduleOCR, rosterInfoOCR
 from DetectRowCount import detectRowCount
 
 
 
 videoPathBaseStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsBaseTestCase.mp4"
 videoPathExtremeStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsExtremeTestCase.mp4"
-videoPathRoster = r"C:\GithubRepos\SMB4-Data-Parser\AttributesTestCaseSeason.mp4"
+videoPathRoster = r"C:\GithubRepos\SMB4-Data-Parser\AttributesTestCaseFranchise.mp4"
 test9Rows = capFrame(videoPathBaseStats, 3)
 test14Rows = capFrame(videoPathBaseStats, 6)
 test20Rows = capFrame(videoPathBaseStats)
 test21Rows = capFrame(videoPathBaseStats, 11)
 test22Rows = capFrame(videoPathBaseStats, 28)
 testExtremeStats = capFrame(videoPathExtremeStats, 31)
-testRosPg1 = capFrame(videoPathRoster, 0, 0, "frame")
+testRosPg1 = capFrame(videoPathRoster, 0)
 testRosPg2 = capFrame(videoPathRoster,1)
-testRosPg3 = capFrame(videoPathRoster,2)
-testRosPg4 = capFrame(videoPathRoster,3)
-showRosterPages = True
+testRosPg3 = capFrame(videoPathRoster,3)
+testRosPg4 = capFrame(videoPathRoster,4)
+test2RosPg1 = capFrame(videoPathRoster, 8)
+test2RosPg2 = capFrame(videoPathRoster, 10)
+test2RosPg3 = capFrame(videoPathRoster, 12)
+test2RosPg4 = capFrame(videoPathRoster, 14)
+
+showRosterPages = False
 if showRosterPages:
-    cv2.imshow("Page 1", testRosPg1)
-    cv2.imshow("Page 2", testRosPg2) 
-    cv2.imshow("Page 3", testRosPg3)
-    cv2.imshow("Page 4", testRosPg4)
+    cv2.imshow("Page 1", test2RosPg1)
+    cv2.imshow("Page 2", test2RosPg2) 
+    cv2.imshow("Page 3", test2RosPg3)
+    cv2.imshow("Page 4", test2RosPg4)
     cv2.waitKey(0)
     cv2.destroyAllWindows   
 
@@ -104,7 +85,19 @@ if testPitchingStats:
     pdDF9.to_excel("C:\\GithubRepos\\TestData\\test9RowsPitchingStats.xlsx", index=False)
     print("9 Row Case Pitching Stats:", pdDF9)
 
+testRoster1Info = False
+if testRoster1Info:
+    import pandas as pd
+    pdDFRoster = pd.DataFrame(rosterInfoOCR(testRosPg1, testRosPg2, testRosPg3, testRosPg4))
+    pdDFRoster.to_excel("C:\\GithubRepos\\TestData\\testRosterPage.xlsx", index=False)
+    print("Roster Page:", pdDFRoster)
 
+testRoster2Info = True
+if testRoster2Info:
+    import pandas as pd
+    pdDFRoster = pd.DataFrame(rosterInfoOCR(test2RosPg1, test2RosPg2, test2RosPg3, test2RosPg4))
+    pdDFRoster.to_excel("C:\\GithubRepos\\TestData\\test2RosterPage.xlsx", index=False)
+    print("Roster Page:", pdDFRoster)
 
 generateCoords = False
 if generateCoords:
@@ -120,7 +113,7 @@ if generateCoords:
     # Example image
 
 
-    cv2.imshow("Image", test9Rows)
+    cv2.imshow("Image", testRosPg4)
     cv2.setMouseCallback("Image", clickEvent)
 
     cv2.waitKey(0)
