@@ -10,7 +10,7 @@ teamNameConfig = "--psm 7"
 scoreConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
 gameConfig = "--psm 7 -c tessedit_char_whitelist=0123456789#"
 traitConfig = "--psm 7 -c preserve_inerword_spaces=1, tessedit_char_whitelist=24-()AaBbcCdDeEFfgGHhiIJjkKlLmMnNoOpPrRsStTuUVvwWxyZz"
-playerRatingConfig = "--psm 7 -c tessedit_char_whitelist=0123456789-"
+playerRatingConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
 chemistryConfig = "--psm 7 -c tessedit_char_whitelist=SPICMHDRA"
 priPosConfig = "--psm 7 -c tessedit_char_whitelist=123BSFCLRSP/"
 secPosConfig = "--psm 7 -c tessedit_char_whitelist=123BSFCLRSPOI/ "
@@ -35,6 +35,7 @@ def ocrCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=None
         output, confidence = ocrWordsWithConfidence(roi, config=config)
     elif type == "numbers":
         output, confidence = ocrNumbersWithConfidence(roi, config=config)
+    
     elif type == "pos":
         thresholded = cv2.threshold(roi, 200, 255, cv2.THRESH_BINARY_INV)[1]
         darkPixels = cv2.countNonZero(thresholded)
@@ -57,6 +58,11 @@ def ocrCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=None
     elif type == "trait":
         output, confidence = ocrTraitsWithConfidence(roi, config=config)
 
+    elif type == "salary":
+        output, confidence = ocrSalaryWithConfidence(roi, config=config)
+
+    elif type == "rating":
+        output, confidence = ocrRatingWithConfidence(roi, config=config)
     else:
         output, confidence = 0, 0
     return output, confidence
@@ -146,7 +152,12 @@ def ocrWordsWithConfidence(roi, config, minConfidence=20):
     
     #Combine multi-word outputs (names)
     combinedText = " ".join(texts)
+    
+    
     avgConfidence = sum(confidences) / len(confidences)
+
+    if combinedText == "CC" and (config == priPosConfig or config == secPosConfig):
+        return "C", avgConfidence
 
     reviewNeeded = (avgConfidence < minConfidence or len(texts) > 3)
 
@@ -230,9 +241,102 @@ def ocrTraitsWithConfidence(roi, config, minConfidence = 20):
 
     return combinedText, avgConfidence
 
+def ocrSalaryWithConfidence(roi, config, minConfidence = 20):
+    import pytesseract
+    import re
+    data = pytesseract.image_to_data(roi, config=config, output_type=pytesseract.Output.DICT)
+    texts = []
+    confidences = []
+
+    for i in range(len(data["text"])):
+        text = data["text"][i].strip()
+
+        if text == "":
+            continue
+
+        confidence = int(data["conf"][i])
+
+        if confidence < 0:
+            continue
+
+        texts.append(text)
+        confidences.append(confidence)
+
+    if len(texts) ==0:
+        return 0, 100
+    
+    combinedText = "".join(texts).lower().strip()
+    match = re.search(r"\d+(\.\d+)?", combinedText)
+
+    if not match:
+        return 0, sum(confidences) / len(confidences)
+    
+    try:
+        value = float(match.group(0))
+    except:
+        return 0, 0
+    
+    avgConfidence = sum(confidences) / len(confidences)
+
+    reviewNeeded = (avgConfidence < minConfidence or value>35)
+    if reviewNeeded:
+        print("ONLY ENTER NUMBER, OMIT '$' and 'm'")
+        value = manualReview(roi, texts, confidences)
+
+    return value, avgConfidence
+
+def ocrRatingWithConfidence(roi, config, minConfidence = 20):
+    import pytesseract
+    import numpy as np
+
+    data = pytesseract.image_to_data(roi, config=config, output_type=pytesseract.Output.DICT)
+    texts = []
+    confidences = []
+
+    for i in range(len(data["text"])):
+        text = data["text"][i].strip()
+
+        if text == "":
+            continue
+
+        conf = int(data["conf"][i])
+        if conf<0:
+            continue
+        
+        texts.append(text)
+        confidences.append(conf)
+    
+    if len(texts) == 0:
+        return 0,0
+    
+    combinedText = "".join(texts)
+    value = int(combinedText)
+
+    
+    avgConfidence = sum(confidences) / len(confidences)
+
+
+
+    
+
+    if (value>9) and (avgConfidence>-1):
+        return value, avgConfidence
+
+    
+    
+    reviewNeeded = (value<0 or value>99 or avgConfidence<minConfidence)
+    
+    if (value<9) and (avgConfidence<50):
+        reviewNeeded=True
+
+    if reviewNeeded:
+        value = manualReview(roi, texts, confidences)
+
+    return value, avgConfidence
+
+
 def manualReview(roi, detectedTexts, confidences):
     import cv2
-    print()
     print(f"Detected: {detectedTexts}")
     print(f"Confidence: {confidences}")
     cv2.imshow("Review Needed", roi)
@@ -245,16 +349,16 @@ def manualReview(roi, detectedTexts, confidences):
     else:
         return "".join(detectedTexts)
 
-def batStatsCheck(battingStats):
-    hits = battingStats["hits"]
-    atBats = battingStats["atBats"]
-    homeRuns = battingStats["homeRuns"]
-    doubles = battingStats["doubles"]
-    triples = battingStats["triples"]
-    totalBases = battingStats["totalBases"]
-    rbi = battingStats["rbi"]
-    runs = battingStats["runs"]
-    strikeouts = battingStats["strikeouts"]
+def batStatsCheck(playerStats):
+    hits = playerStats["hits"]
+    atBats = playerStats["atBats"]
+    homeRuns = playerStats["homeRuns"]
+    doubles = playerStats["doubles"]
+    triples = playerStats["triples"]
+    totalBases = playerStats["totalBases"]
+    rbi = playerStats["rbi"]
+    runs = playerStats["runs"]
+    strikeouts = playerStats["strikeouts"]
     batStatsNeedReview = False
     
     if (
@@ -275,29 +379,29 @@ def batStatsCheck(battingStats):
     or strikeouts > atBats
 ):
         batStatsNeedReview = True
-    battingStats.append(batStatsNeedReview)
-    return battingStats
+    playerStats["batStatsNeedReview"]=batStatsNeedReview
+    return playerStats
 
-def pitchStatsCheck(pitchingStats):
+def pitchStatsCheck(playerStats):
 
-    wins = pitchingStats["wins"]
-    losses = pitchingStats["losses"]
-    runsAllowed = pitchingStats["runsAllowed"]
-    earnedRunsAllowed = pitchingStats["earnedRunsAllowed"]
-    gamesPitched = pitchingStats["gamesPitched"]
-    gamesStarted = pitchingStats["gamesStarted"]
-    saves = pitchingStats["saves"]
-    inningsPitched = pitchingStats["inningsPitched"]
-    hitsAllowed = pitchingStats["hitsAllowed"]
-    pitchingKs = pitchingStats["pitchingKs"]
-    walksAllowed = pitchingStats["walksAllowed"]
-    wildPitches = pitchingStats["wildPitches"]
-    homeRunsAllowed = pitchingStats["homeRunsAllowed"]
-    completeGames = pitchingStats["completeGames"]
-    shutouts = pitchingStats["shutouts"]
-    hitBatsmen = pitchingStats["hitBatsmen"]
-    battersFaced = pitchingStats["battersFaced"]
-    pitchesThrown = pitchingStats["pitchesThrown"]
+    wins = playerStats["wins"]
+    losses = playerStats["losses"]
+    runsAllowed = playerStats["runsAllowed"]
+    earnedRunsAllowed = playerStats["earnedRunsAllowed"]
+    gamesPitched = playerStats["gamesPitched"]
+    gamesStarted = playerStats["gamesStarted"]
+    saves = playerStats["saves"]
+    inningsPitched = playerStats["inningsPitched"]
+    hitsAllowed = playerStats["hitsAllowed"]
+    pitchingKs = playerStats["pitchingKs"]
+    walksAllowed = playerStats["walksAllowed"]
+    wildPitches = playerStats["wildPitches"]
+    homeRunsAllowed = playerStats["homeRunsAllowed"]
+    completeGames = playerStats["completeGames"]
+    shutouts = playerStats["shutouts"]
+    hitBatsmen = playerStats["hitBatsmen"]
+    battersFaced = playerStats["battersFaced"]
+    pitchesThrown = playerStats["pitchesThrown"]
 
     pitchStatsNeedReview = False
 
@@ -319,17 +423,13 @@ def pitchStatsCheck(pitchingStats):
         or pitchesThrown < battersFaced
         or wildPitches > pitchesThrown
         or inningsPitched > (gamesPitched * 9)
-        or battersFaced < (
-            hitsAllowed
-            + walksAllowed
-            + pitchingKs
-            + hitBatsmen
-        )
+        or pitchingKs > (inningsPitched * 3) # greater than 3? technically possible
+        or battersFaced < (hitsAllowed + walksAllowed + pitchingKs + hitBatsmen)
     ):
         pitchStatsNeedReview = True
 
-    pitchingStats.append(pitchStatsNeedReview)
-    return pitchingStats
+    playerStats["pitchStatsNeedReview"]=pitchStatsNeedReview
+    return playerStats
 
 def scheduleOCR(frame):
     import pytesseract
@@ -456,10 +556,25 @@ def batterStatsOCR(frame):
         sf, sfConfidence = ocrCell(frame, yvalue, xValues["sf"], xBuffers["sf"], yBuffer, intConfig, preProcessType="number")
         errors, errorsConfidence = ocrCell(frame, yvalue, xValues["errors"], xBuffers["errors"], yBuffer, intConfig, preProcessType="number")
         
+        games = int(games)
+        atBats = int(atBats)
+        hits = int(hits)
+        homeRuns = int(homeRuns)
+        rbi = int(rbi)
+        runs = int(runs)
+        totalBases = int(totalBases)
+        doubles = int(doubles)
+        triples = int(triples)
+        walks = int(walks)
+        battingK = int(battingK)
+        sb = int(sb)
+        cs = int(cs)
+        hbp = int(hbp)
+        sac = int(sac)
+        sf = int(sf)
+        errors = int(errors)
         
-
-        battingStats.append({
-            "name": name,
+        currentHitter = {"name": name,
             "games": games,
             "atBats": atBats,
             "hits": hits,
@@ -477,11 +592,13 @@ def batterStatsOCR(frame):
             "sacrificeHits": sac,
             "sacrificeFlies": sf,
             "errors": errors,
-            "passedBalls": ""
-        })
-        battingStats = batStatsCheck(battingStats)
+            "passedBalls": ""}
+        
 
-
+        
+        currentHitter = batStatsCheck(currentHitter)
+        battingStats.append(currentHitter)
+        
     return battingStats
 
 def pitcherStatsOCR(frame):
@@ -516,7 +633,26 @@ def pitcherStatsOCR(frame):
         battersFaced ,battersFacedConfidence= ocrCell(frame,yvalue,xValues["battersFaced"],xBuffers["battersFaced"],yBuffer,intConfig ,preProcessType="number")
         pitchesThrown ,pitchesThrownConfidence= ocrCell(frame,yvalue,xValues["pitchesThrown"],xBuffers["pitchesThrown"],yBuffer,intConfig ,preProcessType="number")
 
-        pitchingStats.append({
+        wins = int(wins)
+        losses = int(losses)
+        runsAllowed = int(runsAllowed)
+        earnedRunsAllowed = int(earnedRunsAllowed)
+        gamesPitched = int(gamesPitched)
+        gamesStarted = int(gamesStarted)
+        saves = int(saves)
+        inningsPitched = float(inningsPitched)
+        hitsAllowed = int(hitsAllowed)
+        pitchingKs = int(pitchingKs)
+        walksAllowed = int(walksAllowed)
+        wildPitches = int(wildPitches)
+        homeRunsAllowed = int(homeRunsAllowed)
+        completeGames = int(completeGames)
+        shutouts = int(shutouts)
+        hitBatsmen = int(hitBatsmen)
+        battersFaced = int(battersFaced)
+        pitchesThrown = int(pitchesThrown)
+
+        currentPitcher ={
             "name": name,
             "wins": wins,
             "losses": losses,
@@ -536,8 +672,11 @@ def pitcherStatsOCR(frame):
             "hitBatsmen": hitBatsmen,
             "battersFaced": battersFaced,
             "pitchesThrown": pitchesThrown,
-        })
-        pitchStatsCheck(pitchingStats)
+        }
+        currentPitcher = pitchStatsCheck(currentPitcher)
+        pitchingStats.append(currentPitcher)
+
+
     return pitchingStats
 
 def rosterInfoOCR(pg1, pg2, pg3, pg4):
@@ -556,9 +695,11 @@ def rosterInfoOCR(pg1, pg2, pg3, pg4):
     xValues4 ={"trait1": 1122, "trait2": 1345, "chemType": 961}
     yBuffer = 19
     yBufferHand=21
+    yBufferRating=21
     xBufferName = 116
     xBufferTrait = 70
     xBufferHand = 20
+    xBufferSalary = 40
     xBuffer = 34
     xBufferChemType = 19
 
@@ -577,26 +718,26 @@ def rosterInfoOCR(pg1, pg2, pg3, pg4):
 
         bats, batsConfidence = ocrCell(pg1, yValue, xValues1["bats"], xBufferHand, yBufferHand, handConfig, preProcessType="hand", type="hand")
         throws, throwsConfidence = ocrCell(pg1, yValue, xValues1["throws"], xBufferHand, yBufferHand, handConfig, preProcessType="hand", type="hand")
-        salary, salaryConfidence = ocrCell(pg1, yValue, xValues1["salary"], xBuffer, yBuffer, salaryConfig, preProcessType="salary", type="salary")
+        salary, salaryConfidence = ocrCell(pg1, yValue, xValues1["salary"], xBufferSalary, yBuffer, salaryConfig, preProcessType="salary", type="salary")
 
-        power, powerConfidence = ocrCell(pg2, yValue, xValues2["power"], xBuffer, yBuffer, playerRatingConfig, preProcessType="rating")
-        contact, contactConfidence = ocrCell(pg2, yValue, xValues2["contact"], xBuffer, yBuffer, playerRatingConfig, preProcessType="rating")
-        speed, speedConfidence = ocrCell(pg2, yValue, xValues2["speed"], xBuffer, yBuffer, playerRatingConfig, preProcessType="rating")
-        fielding, fieldingConfidence = ocrCell(pg2, yValue, xValues2["fielding"], xBuffer, yBuffer, playerRatingConfig, preProcessType="rating")
+        power, powerConfidence = ocrCell(pg2, yValue, xValues2["power"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
+        contact, contactConfidence = ocrCell(pg2, yValue, xValues2["contact"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
+        speed, speedConfidence = ocrCell(pg2, yValue, xValues2["speed"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
+        fielding, fieldingConfidence = ocrCell(pg2, yValue, xValues2["fielding"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
 
         if isPitcher:
            arm = "-"; armConfidence = 100
         else:
-            arm, armConfidence = ocrCell(pg2, yValue, xValues2["arm"], xBuffer, yBuffer, playerRatingConfig, preProcessType="rating")
+            arm, armConfidence = ocrCell(pg2, yValue, xValues2["arm"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
 
         if not isPitcher:
             velocity = "-"; velocityConfidence=100
             junk = "-"; junkConfidence=100
             accuracy = "-"; accuracyConfidence=100
         else:
-            velocity, velocityConfidence = ocrCell(pg3, yValue, xValues3["velocity"], xBuffer, yBuffer, playerRatingConfig, preProcessType="rating")
-            junk, junkConfidence = ocrCell(pg3, yValue, xValues3["junk"], xBuffer, yBuffer, playerRatingConfig, preProcessType="rating")
-            accuracy, accuracyConfidence = ocrCell(pg3, yValue, xValues3["accuracy"], xBuffer, yBuffer, playerRatingConfig, preProcessType="rating")
+            velocity, velocityConfidence = ocrCell(pg3, yValue, xValues3["velocity"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
+            junk, junkConfidence = ocrCell(pg3, yValue, xValues3["junk"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
+            accuracy, accuracyConfidence = ocrCell(pg3, yValue, xValues3["accuracy"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
 
         trait1, trait1Confidence = ocrCell(pg4, yValue, xValues4["trait1"], xBufferTrait, yBuffer, traitConfig, preProcessType="trait", type="trait")
         trait2, trait2Confidence = ocrCell(pg4, yValue, xValues4["trait2"], xBufferTrait, yBuffer, traitConfig, preProcessType="trait", type="trait")
