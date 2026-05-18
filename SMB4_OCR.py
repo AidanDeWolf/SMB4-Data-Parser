@@ -1,31 +1,26 @@
 #SMB4_OCR.py
-
-
 import cv2
+import pytesseract
+import ocr_configs
 
-nameConfig = "--psm 7 -c preserve_inerword_spaces=1, tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz."
-intConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
-inningsConfig = "--psm 7 -c tessedit_char_whitelist=0123456789."
-teamNameConfig = "--psm 7"
-scoreConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
-gameConfig = "--psm 7 -c tessedit_char_whitelist=0123456789#"
-traitConfig = "--psm 7 -c preserve_inerword_spaces=1, tessedit_char_whitelist=24-()AaBbcCdDeEFfgGHhiIJjkKlLmMnNoOpPrRsStTuUVvwWxyZz"
-playerRatingConfig = "--psm 7 -c tessedit_char_whitelist=0123456789"
-chemistryConfig = "--psm 7 -c tessedit_char_whitelist=SPICMHDRA"
-priPosConfig = "--psm 7 -c tessedit_char_whitelist=123BSFCLRSP/"
-secPosConfig = "--psm 7 -c tessedit_char_whitelist=123BSFCLRSPOI/ "
-handConfig = "--psm 13 -c tessedit_char_whitelist=LRS"
-salaryConfig = "--psm 7 -c tessedit_char_whitelist=0123456789$m."
-intRetryConfig = "--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789"
-
-def debugOCRCell(roi, text, confidence, label):
-    import pytesseract
-    import cv2
-    if confidence <90 or text == "":
+def extractOCRdata(roi, config):
+    data = pytesseract.image_to_data(
+            roi,
+            config=config,
+            output_type=pytesseract.Output.DICT
+        )
     
-        cv2.imshow(label, roi)
-        print(f"{label}: '{text}' confidence = {confidence}")
-        cv2.waitKey(0)
+    texts = []
+    confidences = []
+    
+    for ocrIndex in range(len(data["text"])):
+            currentText = data["text"][ocrIndex].strip()
+            if currentText == "":
+                continue
+            confidence = int(data["conf"][ocrIndex])
+            texts.append(currentText)
+            confidences.append(confidence)
+    return texts, confidences
 
 def ocrCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=None, type="numbers"):
     from PreProcessing import preProcessing
@@ -62,44 +57,22 @@ def ocrCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=None
         output, confidence = ocrSalaryWithConfidence(roi, config=config)
 
     elif type == "rating":
-        output, confidence = ocrRatingWithConfidence(roi, config=config)
+        output, confidence = ocrNumbersWithConfidence(roi, config=config)
     else:
         output, confidence = 0, 0
     return output, confidence
 
-
 def ocrNumbersWithConfidence(roi, config, minConfidence=1):
-    import pytesseract
-    import cv2
-    def runOCR(roi, config):
-        data = pytesseract.image_to_data(
-            roi,
-            config=config,
-            output_type=pytesseract.Output.DICT
-        )
-        validTexts = []
-        validConfidences = []
 
-        for ocrIndex in range(len(data["text"])):
-            currentText = data["text"][ocrIndex].strip()
-            if currentText == "":
-                continue
-            confidence = int(data["conf"][ocrIndex])
-            validTexts.append(currentText)
-            validConfidences.append(confidence)
-        return validTexts, validConfidences
-    
-    validTexts, validConfidences = runOCR(roi, config = config)
-
-
+    validTexts, validConfidences = extractOCRdata(roi, config)
 
     if len(validTexts) == 0: #or max(validConfidences) <15:
         roi2 = cv2.resize(roi, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
         roi2 = cv2.convertScaleAbs(roi2, alpha=1.6, beta=15)
         roiInv = cv2.bitwise_not(roi2)
         original = (validTexts, validConfidences)
-        second = runOCR(roi2, intRetryConfig)
-        inverted = runOCR(roiInv, intRetryConfig)
+        second = extractOCRdata(roi2, ocr_configs.intRetryConfig)
+        inverted = extractOCRdata(roiInv, ocr_configs.intRetryConfig)
         candidates = [original, second, inverted]
         
         def score(texts, confidences):
@@ -156,7 +129,7 @@ def ocrWordsWithConfidence(roi, config, minConfidence=20):
     
     avgConfidence = sum(confidences) / len(confidences)
 
-    if combinedText == "CC" and (config == priPosConfig or config == secPosConfig):
+    if combinedText == "CC" and (config == ocr_configs.priPosConfig or config == ocr_configs.secPosConfig):
         return "C", avgConfidence
 
     reviewNeeded = (avgConfidence < minConfidence or len(texts) > 3)
@@ -330,10 +303,9 @@ def ocrRatingWithConfidence(roi, config, minConfidence = 20):
         reviewNeeded=True
 
     if reviewNeeded:
-        value = manualReview(roi, texts, confidences)
+        value = int(manualReview(roi, texts, confidences))
 
     return value, avgConfidence
-
 
 def manualReview(roi, detectedTexts, confidences):
     import cv2
@@ -454,7 +426,7 @@ def scheduleOCR(frame):
         ]
 
         gameNumber = pytesseract.image_to_string(
-            gameNumberROI, config=gameConfig
+            gameNumberROI, config=ocr_configs.gameConfig
             ).strip()
 
         awayTeamROI = frame[
@@ -462,7 +434,7 @@ def scheduleOCR(frame):
             xvalues[1] - teamName_xBuffer : xvalues[1] + teamName_xBuffer
         ]
         awayTeam = pytesseract.image_to_string(
-            awayTeamROI, config=teamNameConfig
+            awayTeamROI, config=ocr_configs.teamNameConfig
         ).strip()
 
         awayScoreROI = frame[
@@ -470,7 +442,7 @@ def scheduleOCR(frame):
             xvalues[2] - teamScore_x_Buffer : xvalues[2] + teamScore_x_Buffer
         ]
         awayScore = pytesseract.image_to_string(
-            awayScoreROI, config=scoreConfig
+            awayScoreROI, config=ocr_configs.scoreConfig
         ).strip().replace("#","")
 
         homeScoreROI = frame[
@@ -478,7 +450,7 @@ def scheduleOCR(frame):
             xvalues[3] - teamScore_x_Buffer : xvalues[3] + teamScore_x_Buffer
         ]
         homeScore = pytesseract.image_to_string(
-            homeScoreROI, config=scoreConfig
+            homeScoreROI, config=ocr_configs.scoreConfig
         ).strip()
 
         homeTeamROI = frame[
@@ -486,7 +458,7 @@ def scheduleOCR(frame):
             xvalues[4] - teamName_xBuffer : xvalues[4] + teamName_xBuffer
         ]
         homeTeam = pytesseract.image_to_string(
-            homeTeamROI, config=teamNameConfig
+            homeTeamROI, config=ocr_configs.teamNameConfig
         ).strip()
 
         if awayScore == "":
@@ -537,24 +509,24 @@ def batterStatsOCR(frame):
 
     for yvalue in yvalues[:rowCount]:
     
-        name, nameConfidence = ocrCell(frame, yvalue, xValues["name"], xBuffers["name"], yBuffer, nameConfig, preProcessType="name", type="words")
-        games, gamesConfidence = ocrCell(frame, yvalue, xValues["games"], xBuffers["games"], yBuffer, intConfig, preProcessType="number")
-        atBats, atBatsConfidence = ocrCell(frame, yvalue, xValues["atBats"], xBuffers["atBats"], yBuffer, intConfig, preProcessType="number")
-        hits, hitsConfidence = ocrCell(frame, yvalue, xValues["hits"], xBuffers["hits"], yBuffer, intConfig, preProcessType="number")
-        homeRuns, homeRunsConfidence = ocrCell(frame, yvalue, xValues["homeRuns"], xBuffers["homeRuns"], yBuffer, intConfig, preProcessType="number")
-        rbi, rbiConfidence = ocrCell(frame, yvalue, xValues["rbi"], xBuffers["rbi"], yBuffer, intConfig, preProcessType="number")
-        runs, runsConfidence = ocrCell(frame, yvalue, xValues["runs"], xBuffers["runs"], yBuffer, intConfig, preProcessType="number")
-        totalBases, totalBasesConfidence = ocrCell(frame, yvalue, xValues["totalBases"], xBuffers["totalBases"], yBuffer, intConfig, preProcessType="number")
-        doubles, doublesConfidence = ocrCell(frame, yvalue, xValues["doubles"], xBuffers["doubles"], yBuffer, intConfig, preProcessType="number")
-        triples, triplesConfidence = ocrCell(frame, yvalue, xValues["triples"], xBuffers["triples"], yBuffer, intConfig, preProcessType="number")
-        walks, walksConfidence = ocrCell(frame, yvalue, xValues["walks"], xBuffers["walks"], yBuffer, intConfig, preProcessType="number")
-        battingK, battingKConfidence = ocrCell(frame, yvalue, xValues["battingK"], xBuffers["battingK"], yBuffer, intConfig, preProcessType="number")
-        sb, sbConfidence = ocrCell(frame, yvalue, xValues["sb"], xBuffers["sb"], yBuffer, intConfig, preProcessType="number")
-        cs, csConfidence = ocrCell(frame, yvalue, xValues["cs"], xBuffers["cs"], yBuffer, intConfig, preProcessType="number")
-        hbp, hbpConfidence = ocrCell(frame, yvalue, xValues["hbp"], xBuffers["hbp"], yBuffer, intConfig, preProcessType="number")
-        sac, sacConfidence = ocrCell(frame, yvalue, xValues["sac"], xBuffers["sac"], yBuffer, intConfig, preProcessType="number")
-        sf, sfConfidence = ocrCell(frame, yvalue, xValues["sf"], xBuffers["sf"], yBuffer, intConfig, preProcessType="number")
-        errors, errorsConfidence = ocrCell(frame, yvalue, xValues["errors"], xBuffers["errors"], yBuffer, intConfig, preProcessType="number")
+        name, nameConfidence = ocrCell(frame, yvalue, xValues["name"], xBuffers["name"], yBuffer, ocr_configs.nameConfig, preProcessType="name", type="words")
+        games, gamesConfidence = ocrCell(frame, yvalue, xValues["games"], xBuffers["games"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        atBats, atBatsConfidence = ocrCell(frame, yvalue, xValues["atBats"], xBuffers["atBats"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        hits, hitsConfidence = ocrCell(frame, yvalue, xValues["hits"], xBuffers["hits"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        homeRuns, homeRunsConfidence = ocrCell(frame, yvalue, xValues["homeRuns"], xBuffers["homeRuns"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        rbi, rbiConfidence = ocrCell(frame, yvalue, xValues["rbi"], xBuffers["rbi"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        runs, runsConfidence = ocrCell(frame, yvalue, xValues["runs"], xBuffers["runs"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        totalBases, totalBasesConfidence = ocrCell(frame, yvalue, xValues["totalBases"], xBuffers["totalBases"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        doubles, doublesConfidence = ocrCell(frame, yvalue, xValues["doubles"], xBuffers["doubles"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        triples, triplesConfidence = ocrCell(frame, yvalue, xValues["triples"], xBuffers["triples"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        walks, walksConfidence = ocrCell(frame, yvalue, xValues["walks"], xBuffers["walks"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        battingK, battingKConfidence = ocrCell(frame, yvalue, xValues["battingK"], xBuffers["battingK"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        sb, sbConfidence = ocrCell(frame, yvalue, xValues["sb"], xBuffers["sb"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        cs, csConfidence = ocrCell(frame, yvalue, xValues["cs"], xBuffers["cs"], yBuffer, ocr_configs.ntConfig, preProcessType="number")
+        hbp, hbpConfidence = ocrCell(frame, yvalue, xValues["hbp"], xBuffers["hbp"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        sac, sacConfidence = ocrCell(frame, yvalue, xValues["sac"], xBuffers["sac"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        sf, sfConfidence = ocrCell(frame, yvalue, xValues["sf"], xBuffers["sf"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        errors, errorsConfidence = ocrCell(frame, yvalue, xValues["errors"], xBuffers["errors"], yBuffer, ocr_configs.intConfig, preProcessType="number")
         
         games = int(games)
         atBats = int(atBats)
@@ -613,25 +585,25 @@ def pitcherStatsOCR(frame):
     rowCount = detectRowCount(frame)
 
     for yvalue in yvalues[:rowCount]:
-        name, nameConfidence = ocrCell(frame, yvalue, xValues["name"], xBuffers["name"], yBuffer, nameConfig, preProcessType="name", type="words")
-        wins, winsConfidence = ocrCell(frame, yvalue, xValues["wins"], xBuffers["wins"], yBuffer, intConfig, preProcessType="number")
-        losses, lossesConfidence = ocrCell(frame, yvalue, xValues["losses"], xBuffers["losses"], yBuffer, intConfig, preProcessType="number")
-        runsAllowed, runsAllowedConfidence = ocrCell(frame, yvalue, xValues["runsAllowed"], xBuffers["runsAllowed"], yBuffer, intConfig, preProcessType="number")
-        earnedRunsAllowed, earnedRunsAllowedConfidence = ocrCell(frame, yvalue, xValues["earnedRunsAllowed"], xBuffers["earnedRunsAllowed"], yBuffer, intConfig, preProcessType="number")
-        gamesPitched, gamesPitchedConfidence = ocrCell(frame, yvalue, xValues["gamesPitched"], xBuffers["gamesPitched"], yBuffer, intConfig, preProcessType="number")
-        gamesStarted, gamesStartedConfidence = ocrCell(frame, yvalue, xValues["gamesStarted"], xBuffers["gamesStarted"], yBuffer, intConfig, preProcessType="number")
-        saves, savesConfidence = ocrCell(frame, yvalue, xValues["saves"], xBuffers["saves"], yBuffer, intConfig, preProcessType="number")
-        inningsPitched, inningsPitchedConfidence = ocrCell(frame, yvalue, xValues["inningsPitched"], xBuffers["inningsPitched"], yBuffer, inningsConfig, preProcessType="number")
-        hitsAllowed, hitsAllowedConfidence = ocrCell(frame, yvalue, xValues["hitsAllowed"], xBuffers["hitsAllowed"], yBuffer, intConfig, preProcessType="number")
-        pitchingKs, pitchingKsConfidence = ocrCell(frame,yvalue,xValues["pitchingKs"],xBuffers["pitchingKs"],yBuffer,intConfig ,preProcessType="number")
-        walksAllowed ,walksAllowedConfidence= ocrCell(frame,yvalue,xValues["walksAllowed"],xBuffers["walksAllowed"],yBuffer,intConfig ,preProcessType="number")
-        wildPitches ,wildPitchesConfidence= ocrCell(frame,yvalue,xValues["wildPitches"],xBuffers["wildPitches"],yBuffer,intConfig ,preProcessType="number")
-        homeRunsAllowed, homeRunsAllowedConfidence = ocrCell(frame,yvalue,xValues["homeRunsAllowed"],xBuffers["homeRunsAllowed"],yBuffer,intConfig ,preProcessType="number")
-        completeGames ,completeGamesConfidence= ocrCell(frame,yvalue,xValues["completeGames"],xBuffers["completeGames"],yBuffer,intConfig ,preProcessType="number")
-        shutouts ,shutoutsConfidence= ocrCell(frame,yvalue,xValues["shutouts"],xBuffers["shutouts"],yBuffer,intConfig ,preProcessType="number")
-        hitBatsmen ,hitBatsmenConfidence= ocrCell(frame,yvalue,xValues["hitBatsmen"],xBuffers["hitBatsmen"],yBuffer,intConfig ,preProcessType="number")
-        battersFaced ,battersFacedConfidence= ocrCell(frame,yvalue,xValues["battersFaced"],xBuffers["battersFaced"],yBuffer,intConfig ,preProcessType="number")
-        pitchesThrown ,pitchesThrownConfidence= ocrCell(frame,yvalue,xValues["pitchesThrown"],xBuffers["pitchesThrown"],yBuffer,intConfig ,preProcessType="number")
+        name, nameConfidence = ocrCell(frame, yvalue, xValues["name"], xBuffers["name"], yBuffer, ocr_configs.nameConfig, preProcessType="name", type="words")
+        wins, winsConfidence = ocrCell(frame, yvalue, xValues["wins"], xBuffers["wins"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        losses, lossesConfidence = ocrCell(frame, yvalue, xValues["losses"], xBuffers["losses"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        runsAllowed, runsAllowedConfidence = ocrCell(frame, yvalue, xValues["runsAllowed"], xBuffers["runsAllowed"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        earnedRunsAllowed, earnedRunsAllowedConfidence = ocrCell(frame, yvalue, xValues["earnedRunsAllowed"], xBuffers["earnedRunsAllowed"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        gamesPitched, gamesPitchedConfidence = ocrCell(frame, yvalue, xValues["gamesPitched"], xBuffers["gamesPitched"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        gamesStarted, gamesStartedConfidence = ocrCell(frame, yvalue, xValues["gamesStarted"], xBuffers["gamesStarted"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        saves, savesConfidence = ocrCell(frame, yvalue, xValues["saves"], xBuffers["saves"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        inningsPitched, inningsPitchedConfidence = ocrCell(frame, yvalue, xValues["inningsPitched"], xBuffers["inningsPitched"], yBuffer, ocr_configs.inningsConfig, preProcessType="number")
+        hitsAllowed, hitsAllowedConfidence = ocrCell(frame, yvalue, xValues["hitsAllowed"], xBuffers["hitsAllowed"], yBuffer, ocr_configs.intConfig, preProcessType="number")
+        pitchingKs, pitchingKsConfidence = ocrCell(frame,yvalue,xValues["pitchingKs"],xBuffers["pitchingKs"],yBuffer,ocr_configs.intConfig ,preProcessType="number")
+        walksAllowed ,walksAllowedConfidence= ocrCell(frame,yvalue,xValues["walksAllowed"],xBuffers["walksAllowed"],yBuffer,ocr_configs.intConfig ,preProcessType="number")
+        wildPitches ,wildPitchesConfidence= ocrCell(frame,yvalue,xValues["wildPitches"],xBuffers["wildPitches"],yBuffer,ocr_configs.intConfig ,preProcessType="number")
+        homeRunsAllowed, homeRunsAllowedConfidence = ocrCell(frame,yvalue,xValues["homeRunsAllowed"],xBuffers["homeRunsAllowed"],yBuffer,ocr_configs.intConfig ,preProcessType="number")
+        completeGames ,completeGamesConfidence= ocrCell(frame,yvalue,xValues["completeGames"],xBuffers["completeGames"],yBuffer,ocr_configs.intConfig ,preProcessType="number")
+        shutouts ,shutoutsConfidence= ocrCell(frame,yvalue,xValues["shutouts"],xBuffers["shutouts"],yBuffer,ocr_configs.intConfig ,preProcessType="number")
+        hitBatsmen ,hitBatsmenConfidence= ocrCell(frame,yvalue,xValues["hitBatsmen"],xBuffers["hitBatsmen"],yBuffer,ocr_configs.intConfig ,preProcessType="number")
+        battersFaced ,battersFacedConfidence= ocrCell(frame,yvalue,xValues["battersFaced"],xBuffers["battersFaced"],yBuffer,ocr_configs.intConfig ,preProcessType="number")
+        pitchesThrown ,pitchesThrownConfidence= ocrCell(frame,yvalue,xValues["pitchesThrown"],xBuffers["pitchesThrown"],yBuffer,ocr_configs.intConfig ,preProcessType="number")
 
         wins = int(wins)
         losses = int(losses)
@@ -704,44 +676,44 @@ def rosterInfoOCR(pg1, pg2, pg3, pg4):
     xBufferChemType = 19
 
     for yValue in yValues:
-        name, nameConfidence = ocrCell(pg1, yValue, xValues1["name"], xBufferName, yBuffer, nameConfig, preProcessType="name", type="words")
-        age, ageConfidence = ocrCell(pg1, yValue, xValues1["age"], xBuffer, yBuffer, intConfig, preProcessType="number")
+        name, nameConfidence = ocrCell(pg1, yValue, xValues1["name"], xBufferName, yBuffer, ocr_configs.nameConfig, preProcessType="name", type="words")
+        age, ageConfidence = ocrCell(pg1, yValue, xValues1["age"], xBuffer, yBuffer, ocr_configs.intConfig, preProcessType="number")
 
-        primary, primaryConfidence = ocrCell(pg1, yValue, xValues1["primary"], xBuffer, yBuffer, priPosConfig, preProcessType="pos", type="pos")
+        primary, primaryConfidence = ocrCell(pg1, yValue, xValues1["primary"], xBuffer, yBuffer, ocr_configs.priPosConfig, preProcessType="pos", type="pos")
 
         isPitcher = primary in ("SP", "RP", "CP", "SP/RP")
 
         if isPitcher:
             secondary = ""; secondaryConfidence=100
         else:
-            secondary, secondaryConfidence = ocrCell(pg1, yValue, xValues1["secondary"], xBuffer, yBuffer, secPosConfig, preProcessType="pos", type="pos")
+            secondary, secondaryConfidence = ocrCell(pg1, yValue, xValues1["secondary"], xBuffer, yBuffer, ocr_configs.secPosConfig, preProcessType="pos", type="pos")
 
-        bats, batsConfidence = ocrCell(pg1, yValue, xValues1["bats"], xBufferHand, yBufferHand, handConfig, preProcessType="hand", type="hand")
-        throws, throwsConfidence = ocrCell(pg1, yValue, xValues1["throws"], xBufferHand, yBufferHand, handConfig, preProcessType="hand", type="hand")
-        salary, salaryConfidence = ocrCell(pg1, yValue, xValues1["salary"], xBufferSalary, yBuffer, salaryConfig, preProcessType="salary", type="salary")
+        bats, batsConfidence = ocrCell(pg1, yValue, xValues1["bats"], xBufferHand, yBufferHand, ocr_configs.handConfig, preProcessType="hand", type="hand")
+        throws, throwsConfidence = ocrCell(pg1, yValue, xValues1["throws"], xBufferHand, yBufferHand, ocr_configs.handConfig, preProcessType="hand", type="hand")
+        salary, salaryConfidence = ocrCell(pg1, yValue, xValues1["salary"], xBufferSalary, yBuffer, ocr_configs.salaryConfig, preProcessType="salary", type="salary")
 
-        power, powerConfidence = ocrCell(pg2, yValue, xValues2["power"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
-        contact, contactConfidence = ocrCell(pg2, yValue, xValues2["contact"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
-        speed, speedConfidence = ocrCell(pg2, yValue, xValues2["speed"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
-        fielding, fieldingConfidence = ocrCell(pg2, yValue, xValues2["fielding"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
+        power, powerConfidence = ocrCell(pg2, yValue, xValues2["power"], xBuffer, yBufferRating, ocr_configs.playerRatingConfig, preProcessType="rating", type="rating")
+        contact, contactConfidence = ocrCell(pg2, yValue, xValues2["contact"], xBuffer, yBufferRating, ocr_configs.playerRatingConfig, preProcessType="rating", type="rating")
+        speed, speedConfidence = ocrCell(pg2, yValue, xValues2["speed"], xBuffer, yBufferRating, ocr_configs.playerRatingConfig, preProcessType="rating", type="rating")
+        fielding, fieldingConfidence = ocrCell(pg2, yValue, xValues2["fielding"], xBuffer, yBufferRating, ocr_configs.playerRatingConfig, preProcessType="rating", type="rating")
 
         if isPitcher:
            arm = "-"; armConfidence = 100
         else:
-            arm, armConfidence = ocrCell(pg2, yValue, xValues2["arm"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
+            arm, armConfidence = ocrCell(pg2, yValue, xValues2["arm"], xBuffer, yBufferRating, ocr_configs.playerRatingConfig, preProcessType="rating", type="rating")
 
         if not isPitcher:
             velocity = "-"; velocityConfidence=100
             junk = "-"; junkConfidence=100
             accuracy = "-"; accuracyConfidence=100
         else:
-            velocity, velocityConfidence = ocrCell(pg3, yValue, xValues3["velocity"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
-            junk, junkConfidence = ocrCell(pg3, yValue, xValues3["junk"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
-            accuracy, accuracyConfidence = ocrCell(pg3, yValue, xValues3["accuracy"], xBuffer, yBufferRating, playerRatingConfig, preProcessType="rating", type="rating")
+            velocity, velocityConfidence = ocrCell(pg3, yValue, xValues3["velocity"], xBuffer, yBufferRating, ocr_configs.playerRatingConfig, preProcessType="rating", type="rating")
+            junk, junkConfidence = ocrCell(pg3, yValue, xValues3["junk"], xBuffer, yBufferRating, ocr_configs.playerRatingConfig, preProcessType="rating", type="rating")
+            accuracy, accuracyConfidence = ocrCell(pg3, yValue, xValues3["accuracy"], xBuffer, yBufferRating, ocr_configs.playerRatingConfig, preProcessType="rating", type="rating")
 
-        trait1, trait1Confidence = ocrCell(pg4, yValue, xValues4["trait1"], xBufferTrait, yBuffer, traitConfig, preProcessType="trait", type="trait")
-        trait2, trait2Confidence = ocrCell(pg4, yValue, xValues4["trait2"], xBufferTrait, yBuffer, traitConfig, preProcessType="trait", type="trait")
-        chemType, chemTypeConfidence = ocrCell(pg4, yValue, xValues4["chemType"], xBufferChemType, yBuffer, chemistryConfig, preProcessType="trait", type="letters")
+        trait1, trait1Confidence = ocrCell(pg4, yValue, xValues4["trait1"], xBufferTrait, yBuffer, ocr_configs.traitConfig, preProcessType="trait", type="trait")
+        trait2, trait2Confidence = ocrCell(pg4, yValue, xValues4["trait2"], xBufferTrait, yBuffer, ocr_configs.traitConfig, preProcessType="trait", type="trait")
+        chemType, chemTypeConfidence = ocrCell(pg4, yValue, xValues4["chemType"], xBufferChemType, yBuffer, ocr_configs.chemistryConfig, preProcessType="trait", type="words")
 
         playerInfo.append({ "name": name, "age": age, "primary": primary, "secondary": secondary, 
                            "bats": bats, "throws": throws, "salary": salary, 

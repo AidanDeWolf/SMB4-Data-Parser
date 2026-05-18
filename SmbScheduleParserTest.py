@@ -13,7 +13,7 @@ testBattingStats = False
 testPitchingStats = False
 showRosterPages = False
 testRoster1Info = False
-testRoster2Info = False
+testRoster2Info = True
 generateCoords = False
 
 def capFrame(videoPath, timestampSecs = 0):
