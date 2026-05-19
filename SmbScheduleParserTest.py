@@ -12,7 +12,7 @@ testDetectRows = False
 testBattingStats = False
 testPitchingStats = False
 showRosterPages = False
-testRoster1Info = False
+testRoster1Info = True
 testRoster2Info = True
 generateCoords = False
 
@@ -61,22 +61,6 @@ test2RosPg2 = capFrame(videoPathRoster, 10)
 test2RosPg3 = capFrame(videoPathRoster, 12)
 test2RosPg4 = capFrame(videoPathRoster, 14)
 
-""" yValue = 199
-yBuffer = 19
-xValue = 1184
-xBuffer = 34
-roi = test2RosPg2[yValue - yBuffer : yValue + yBuffer, xValue - xBuffer : xValue + xBuffer]
-roi = cv2.resize(roi, None, fx=4, fy=4, interpolation=cv2.INTER_LINEAR)
-hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-h,s,v = cv2.split(hsv)
-white_mask = (v>185) & (s<90)
-output = np.zeros_like(v)
-output[white_mask] = 255
-
-kernel = np.ones((2,2), np.uint8)
-output = cv2.dilate(output, kernel, iterations=1)
-cv2.imshow("ROI", output)
-cv2.waitKey(0) """
 
 
 if showRosterPages:
@@ -121,6 +105,7 @@ if testRoster2Info:
     pdDFRoster = pd.DataFrame(rosterInfoOCR(test2RosPg1, test2RosPg2, test2RosPg3, test2RosPg4))
     pdDFRoster.to_excel("C:\\GithubRepos\\TestData\\test2RosterPage.xlsx", index=False)
     print("Roster2 Exported")
+
 
 if generateCoords:
     clickedPoint = None

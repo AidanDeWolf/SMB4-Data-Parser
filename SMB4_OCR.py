@@ -4,6 +4,16 @@ import pytesseract
 import ocr_configs
 
 def extractOCRdata(roi, config):
+    """
+    Performs OCR on an image
+    Args:
+        roi: the image to be processed
+        config: the configuration for tesseract to use
+    Returns:
+        texts: detected text
+        confidences: confidences for each text
+    """
+
     data = pytesseract.image_to_data(
             roi,
             config=config,
@@ -22,6 +32,70 @@ def extractOCRdata(roi, config):
             confidences.append(confidence)
     return texts, confidences
 
+def retryOCR(roi, config, validTexts, validConfidences):
+        """
+        Retries OCR using alternative preprocessing strategies and returns the highest scoring result
+
+        Args:
+            roi: the image to be processed
+            config: the configuration for tesseract to use on the retry
+            validTexts: the original OCR output
+            validConfidences: confidence for the original OCR output
+        Returns:
+            tuple[list[str], list[int]]: The highest scoring OCR text results and their associated confidence value
+        """
+        print("retryOCR triggered")
+        #BORDER TRY
+    
+        roi2 = cv2.resize(roi, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+        roi2 = cv2.convertScaleAbs(roi2, alpha=1.6, beta=15)
+
+
+        roi3 = cv2.resize(roi, None, fx=4, fy=2, interpolation=cv2.INTER_CUBIC)
+
+        roi3 = cv2.convertScaleAbs(roi3, alpha = 1.6, beta = 15)
+        extraXscaled = cv2.resize(roi, None, fx=6, fy=2, interpolation=cv2.INTER_CUBIC)
+        extraXscaled = cv2.convertScaleAbs(roi3, alpha = 1.6, beta = 15)
+
+        roi4 = cv2.copyMakeBorder(roi2, top=5, bottom=5, left = 5, right=5, borderType=cv2.BORDER_CONSTANT, value =255)
+
+        roiInv = cv2.bitwise_not(roi2)
+        original = (validTexts, validConfidences)
+        second = extractOCRdata(roi2, config)
+        inverted = extractOCRdata(roiInv, config)
+        xscaled = extractOCRdata(roi3, config)
+        bordered = extractOCRdata(roi4, config)
+        psm72 = extractOCRdata(roi2, ocr_configs.playerRatingConfig)
+        extraXscaled = extractOCRdata(extraXscaled, ocr_configs.playerRatingConfig)
+
+        candidates = [original, second, inverted, xscaled, bordered, psm72]
+        
+        def score(texts, confidences):
+            if len(texts) == 0:
+                return -1111
+            avgConf = sum(confidences) / len(confidences)
+            fragmentationPenalty = (-0.5) * (len(texts) - 1)
+            return (avgConf - fragmentationPenalty)
+        
+        validTexts, validConfidences = max(candidates, key=lambda x: score(x[0], x[1]))
+        return validTexts, validConfidences
+        
+def combineTextOCR(validTexts):
+    if len(validTexts) == 0:
+        combinedText = ""
+        avgConfidence = -1
+    elif len(validTexts) > 1:
+        combinedText = "".join(validTexts)
+    else:
+        combinedText = validTexts[0]
+    return combinedText
+
+def averageConfidence(confidences):
+    if not confidences:
+        return -1
+    return sum(confidences) / len(confidences)
+    
+
 def ocrCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=None, type="numbers"):
     from PreProcessing import preProcessing
     roi = frame[yValue - yBuffer : yValue + yBuffer, xValue - xBuffer : xValue + xBuffer]
@@ -34,12 +108,6 @@ def ocrCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=None
     elif type == "pos":
         thresholded = cv2.threshold(roi, 200, 255, cv2.THRESH_BINARY_INV)[1]
         darkPixels = cv2.countNonZero(thresholded)
-        """ print("Dark Pixels: ", darkPixels)
-        h, w = thresholded.shape[:]
-        totalPixels = h*w
-        print("Total Pixels: ", totalPixels)
-        cv2.imshow("ROI", thresholded)
-        cv2.waitKey(0)  """
 
         if darkPixels >10150:
             output, confidence = "", 100
@@ -57,7 +125,7 @@ def ocrCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=None
         output, confidence = ocrSalaryWithConfidence(roi, config=config)
 
     elif type == "rating":
-        output, confidence = ocrNumbersWithConfidence(roi, config=config)
+        output, confidence = ocrRatingWithConfidence(roi, config=config)
     else:
         output, confidence = 0, 0
     return output, confidence
@@ -67,30 +135,9 @@ def ocrNumbersWithConfidence(roi, config, minConfidence=1):
     validTexts, validConfidences = extractOCRdata(roi, config)
 
     if len(validTexts) == 0: #or max(validConfidences) <15:
-        roi2 = cv2.resize(roi, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-        roi2 = cv2.convertScaleAbs(roi2, alpha=1.6, beta=15)
-        roiInv = cv2.bitwise_not(roi2)
-        original = (validTexts, validConfidences)
-        second = extractOCRdata(roi2, ocr_configs.intRetryConfig)
-        inverted = extractOCRdata(roiInv, ocr_configs.intRetryConfig)
-        candidates = [original, second, inverted]
+        validTexts, validConfidences = retryOCR(roi, ocr_configs.intRetryConfig, validTexts, validConfidences)
         
-        def score(texts, confidences):
-            if len(texts) == 0:
-                return -1111
-            avgConf = sum(confidences) / len(confidences)
-            fragmentationPenalty = (-0.5) * (len(texts) - 1)
-            return (avgConf - fragmentationPenalty)
-        
-        validTexts, validConfidences = max(candidates, key=lambda x: score(x[0], x[1]))
-
-    if len(validTexts) == 0:
-        combinedText = ""
-        averageConfidence = -1
-    elif len(validTexts) > 1:
-        combinedText = "".join(validTexts)
-    else:
-        combinedText = validTexts[0]
+    combinedText = combineTextOCR(validTexts)
     
     averageConfidence = (sum(validConfidences) / len(validConfidences) if len(validConfidences) > 0 else -1)
     reviewNeeded = (len(validTexts) == 0 or averageConfidence < minConfidence)
@@ -259,47 +306,32 @@ def ocrSalaryWithConfidence(roi, config, minConfidence = 20):
     return value, avgConfidence
 
 def ocrRatingWithConfidence(roi, config, minConfidence = 20):
-    import pytesseract
-    import numpy as np
-
-    data = pytesseract.image_to_data(roi, config=config, output_type=pytesseract.Output.DICT)
-    texts = []
-    confidences = []
-
-    for i in range(len(data["text"])):
-        text = data["text"][i].strip()
-
-        if text == "":
-            continue
-
-        conf = int(data["conf"][i])
-        if conf<0:
-            continue
-        
-        texts.append(text)
-        confidences.append(conf)
+    texts, confidences = extractOCRdata(roi, config)
+    combinedText = combineTextOCR(texts)
+    if not combinedText == "":
+        value = int(combinedText)
+    else:
+        value = -1
     
-    if len(texts) == 0:
-        return 0,0
-    
-    combinedText = "".join(texts)
-    value = int(combinedText)
-
-    
-    avgConfidence = sum(confidences) / len(confidences)
-
-
-
-    
+    avgConfidence = averageConfidence(confidences)
 
     if (value>9) and (avgConfidence>-1):
         return value, avgConfidence
+    elif (avgConfidence>80):
+        return value, avgConfidence
+    else:
+        texts, confidences = retryOCR(roi, ocr_configs.attRetryConfig, texts, confidences)
+        text = combineTextOCR(texts)
+        avgConfidence = averageConfidence(confidences)
+        if not text == "":
+            value = int(text)
+        else:
+            value = -1
 
-    
-    
-    reviewNeeded = (value<0 or value>99 or avgConfidence<minConfidence)
-    
-    if (value<9) and (avgConfidence<50):
+    reviewNeeded=False
+    if (value<0) or (value>99) or avgConfidence<minConfidence:
+        reviewNeeded=True
+    if (value<9) and (avgConfidence<20):
         reviewNeeded=True
 
     if reviewNeeded:
@@ -522,7 +554,7 @@ def batterStatsOCR(frame):
         walks, walksConfidence = ocrCell(frame, yvalue, xValues["walks"], xBuffers["walks"], yBuffer, ocr_configs.intConfig, preProcessType="number")
         battingK, battingKConfidence = ocrCell(frame, yvalue, xValues["battingK"], xBuffers["battingK"], yBuffer, ocr_configs.intConfig, preProcessType="number")
         sb, sbConfidence = ocrCell(frame, yvalue, xValues["sb"], xBuffers["sb"], yBuffer, ocr_configs.intConfig, preProcessType="number")
-        cs, csConfidence = ocrCell(frame, yvalue, xValues["cs"], xBuffers["cs"], yBuffer, ocr_configs.ntConfig, preProcessType="number")
+        cs, csConfidence = ocrCell(frame, yvalue, xValues["cs"], xBuffers["cs"], yBuffer, ocr_configs.intConfig, preProcessType="number")
         hbp, hbpConfidence = ocrCell(frame, yvalue, xValues["hbp"], xBuffers["hbp"], yBuffer, ocr_configs.intConfig, preProcessType="number")
         sac, sacConfidence = ocrCell(frame, yvalue, xValues["sac"], xBuffers["sac"], yBuffer, ocr_configs.intConfig, preProcessType="number")
         sf, sfConfidence = ocrCell(frame, yvalue, xValues["sf"], xBuffers["sf"], yBuffer, ocr_configs.intConfig, preProcessType="number")
