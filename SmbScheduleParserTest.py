@@ -10,13 +10,14 @@ print("CWD:", os.getcwd())
 print("Script Started")
 
 testDetectRows = False
-testBattingStats = False
+testBattingStats = True
 testPitchingStats = False
 showRosterPages = False
 testRoster1Info = False
 testRoster2Info = False
 generateCoords = False
-testSchedule = True
+testSchedule = False
+testSznRosterInfo = False
 
 def capFrame(videoPath, timestampSecs = 0):
     cap = cv2.VideoCapture(videoPath)
@@ -48,6 +49,7 @@ from DetectRowCount import detectRowCount
 videoPathBaseStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsBaseTestCase.mp4"
 videoPathExtremeStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsExtremeTestCase.mp4"
 videoPathRoster = r"C:\GithubRepos\SMB4-Data-Parser\AttributesTestCaseFranchise.mp4"
+videoPathSznRoster = r"C:\GithubRepos\SMB4-Data-Parser\AttributesTestCaseSeason.mp4"
 videoPathBaseSchedule = r"C:\GithubRepos\SMB4-Data-Parser\ScheduleBaseTestCase.mp4"
 test9Rows = capFrame(videoPathBaseStats, 3)
 test14Rows = capFrame(videoPathBaseStats, 6)
@@ -63,14 +65,18 @@ test2RosPg1 = capFrame(videoPathRoster, 8)
 test2RosPg2 = capFrame(videoPathRoster, 10)
 test2RosPg3 = capFrame(videoPathRoster, 12)
 test2RosPg4 = capFrame(videoPathRoster, 14)
+sznRosPg1 = capFrame(videoPathSznRoster, 8)
+sznRosPg2 = capFrame(videoPathSznRoster, 9)
+sznRosPg3 = capFrame(videoPathSznRoster, 11)
+sznRosPg4 = capFrame(videoPathSznRoster, 13)
 
 
 
 if showRosterPages:
-    cv2.imshow("Page 1", test2RosPg1)
-    cv2.imshow("Page 2", test2RosPg2) 
-    cv2.imshow("Page 3", test2RosPg3)
-    cv2.imshow("Page 4", test2RosPg4)
+    cv2.imshow("Page 1", sznRosPg1)
+    cv2.imshow("Page 2", sznRosPg2) 
+    cv2.imshow("Page 3", sznRosPg3)
+    cv2.imshow("Page 4", sznRosPg4)
     cv2.waitKey(0)
     cv2.destroyAllWindows   
 
@@ -109,6 +115,11 @@ if testRoster2Info:
     pdDFRoster.to_excel("C:\\GithubRepos\\TestData\\test2RosterPage.xlsx", index=False)
     print("Roster2 Exported")
 
+if testSznRosterInfo:
+    pdDFRoster = pd.DataFrame(rosterInfoOCR(sznRosPg1, sznRosPg2, sznRosPg3, sznRosPg4, type="season"))
+    pdDFRoster.to_excel("C:\\GithubRepos\\TestData\\testSznRosterPage.xlsx", index=False)
+    print("SznRoster Exported")
+
 
 if generateCoords:
     clickedPoint = None
@@ -123,7 +134,7 @@ if generateCoords:
     # Example image
 
 
-    cv2.imshow("Image", testRosPg4)
+    cv2.imshow("Image", sznRosPg4)
     cv2.setMouseCallback("Image", clickEvent)
 
     cv2.waitKey(0)
