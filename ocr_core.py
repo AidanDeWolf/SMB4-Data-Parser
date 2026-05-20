@@ -1,4 +1,8 @@
 #ocr_core.py
+import pytesseract
+import cv2
+import ocr_configs
+
 def extractOCRdata(roi, config):
     """
     Performs OCR on an image

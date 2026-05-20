@@ -1,6 +1,16 @@
 #SMB4_OCR.py
 import cv2
 import ocr_configs
+from ocr_parsers import (
+    ocrWordsWithConfidence,
+    ocrNumbersWithConfidence,
+    ocrHandednessWithConfidence,
+    ocrTraitsWithConfidence,
+    ocrSalaryWithConfidence,
+    ocrRatingWithConfidence
+)
+from ocr_review import batStatsCheck, pitchStatsCheck
+
 
 def ocrCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=None, type="numbers"):
     from PreProcessing import preProcessing
@@ -35,102 +45,6 @@ def ocrCell(frame, yValue, xValue, xBuffer, yBuffer, config, preProcessType=None
     else:
         output, confidence = 0, 0
     return output, confidence
-
-def manualReview(roi, detectedTexts, confidences):
-    import cv2
-    print(f"Detected: {detectedTexts}")
-    print(f"Confidence: {confidences}")
-    cv2.imshow("Review Needed", roi)
-    cv2.waitKey(1)
-    manual = input(f"Enter correct value:").strip()
-    cv2.destroyWindow("Review Needed")
-    
-    if manual != "":
-        return manual
-    else:
-        return "".join(detectedTexts)
-
-def batStatsCheck(playerStats):
-    hits = playerStats["hits"]
-    atBats = playerStats["atBats"]
-    homeRuns = playerStats["homeRuns"]
-    doubles = playerStats["doubles"]
-    triples = playerStats["triples"]
-    totalBases = playerStats["totalBases"]
-    rbi = playerStats["rbi"]
-    runs = playerStats["runs"]
-    strikeouts = playerStats["strikeouts"]
-    batStatsNeedReview = False
-    
-    if (
-    hits > atBats
-    or homeRuns > hits
-    or doubles > hits
-    or triples > hits
-    or doubles + triples + homeRuns > hits
-    or totalBases < hits
-    or totalBases < (
-        (hits - doubles - triples - homeRuns)
-        + (2 * doubles)
-        + (3 * triples)
-        + (4 * homeRuns)
-    )
-    or rbi < homeRuns
-    or runs < homeRuns
-    or strikeouts > atBats
-):
-        batStatsNeedReview = True
-    playerStats["batStatsNeedReview"]=batStatsNeedReview
-    return playerStats
-
-def pitchStatsCheck(playerStats):
-
-    wins = playerStats["wins"]
-    losses = playerStats["losses"]
-    runsAllowed = playerStats["runsAllowed"]
-    earnedRunsAllowed = playerStats["earnedRunsAllowed"]
-    gamesPitched = playerStats["gamesPitched"]
-    gamesStarted = playerStats["gamesStarted"]
-    saves = playerStats["saves"]
-    inningsPitched = playerStats["inningsPitched"]
-    hitsAllowed = playerStats["hitsAllowed"]
-    pitchingKs = playerStats["pitchingKs"]
-    walksAllowed = playerStats["walksAllowed"]
-    wildPitches = playerStats["wildPitches"]
-    homeRunsAllowed = playerStats["homeRunsAllowed"]
-    completeGames = playerStats["completeGames"]
-    shutouts = playerStats["shutouts"]
-    hitBatsmen = playerStats["hitBatsmen"]
-    battersFaced = playerStats["battersFaced"]
-    pitchesThrown = playerStats["pitchesThrown"]
-
-    pitchStatsNeedReview = False
-
-    if (
-        earnedRunsAllowed > runsAllowed
-        or gamesStarted > gamesPitched
-        or saves > gamesPitched
-        or completeGames > gamesStarted
-        or shutouts > completeGames
-        or homeRunsAllowed > hitsAllowed
-        or inningsPitched < 0
-        or wins > gamesPitched
-        or losses > gamesPitched
-        or wins + losses > gamesPitched
-        or pitchingKs > battersFaced
-        or walksAllowed > battersFaced
-        or hitsAllowed > battersFaced
-        or hitBatsmen > battersFaced
-        or pitchesThrown < battersFaced
-        or wildPitches > pitchesThrown
-        or inningsPitched > (gamesPitched * 9)
-        or pitchingKs > (inningsPitched * 3) # greater than 3? technically possible
-        or battersFaced < (hitsAllowed + walksAllowed + pitchingKs + hitBatsmen)
-    ):
-        pitchStatsNeedReview = True
-
-    playerStats["pitchStatsNeedReview"]=pitchStatsNeedReview
-    return playerStats
 
 def scheduleOCR(frame):
     import pytesseract
@@ -381,7 +295,7 @@ def pitcherStatsOCR(frame):
     return pitchingStats
 
 def rosterInfoOCR(pg1, pg2, pg3, pg4, type="franchise"):
-    battingStats = []
+    rosterInfo = []
     yValues = [
     199, 235, 269, 304, 343, 378, 417, 452, 486, 522,
     559, 595, 632, 667, 701, 739, 775, 811, 846, 882,
@@ -448,14 +362,14 @@ def rosterInfoOCR(pg1, pg2, pg3, pg4, type="franchise"):
         trait2, trait2Confidence = ocrCell(pg4, yValue, xValues4["trait2"], xBufferTrait, yBuffer, ocr_configs.traitConfig, preProcessType="trait", type="trait")
         chemType, chemTypeConfidence = ocrCell(pg4, yValue, xValues4["chemType"], xBufferChemType, yBuffer, ocr_configs.chemistryConfig, preProcessType="trait", type="words")
 
-        currentBatter = {"name": name, "age": age, "primary": primary, "secondary": secondary, 
+        currentPlayer = {"name": name, "age": age, "primary": primary, "secondary": secondary, 
                            "bats": bats, "throws": throws, "salary": salary, 
                            "power": power, "contact": contact, "speed": speed, 
                            "fielding": fielding, "arm": arm, 
                            "velocity": velocity, "junk": junk, "accuracy": accuracy, 
                            "chemType": chemType, "trait1": trait1, "trait2": trait2 }
     
-        currentBatter = batStatsCheck(currentBatter)
-        battingStats.append(currentBatter)
+        
+        rosterInfo.append(currentPlayer)
     
-    return battingStats
+    return rosterInfo

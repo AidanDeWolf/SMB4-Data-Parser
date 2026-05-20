@@ -10,10 +10,10 @@ print("CWD:", os.getcwd())
 print("Script Started")
 
 testDetectRows = False
-testBattingStats = True
+testBattingStats = False
 testPitchingStats = False
 showRosterPages = False
-testRoster1Info = False
+testRoster1Info = True
 testRoster2Info = False
 generateCoords = False
 testSchedule = False
@@ -97,14 +97,12 @@ if testBattingStats:
     pdDF22 = pd.DataFrame(batterStatsOCR(test22Rows))
     pdDF22.to_excel("C:\\GithubRepos\\TestData\\test22RowsBattingStats.xlsx", index=False)
 if testPitchingStats:
-    import pandas as pd
     pdDF9 = pd.DataFrame(pitcherStatsOCR(test9Rows))
     pdDF9.to_excel("C:\\GithubRepos\\TestData\\test9RowsPitchingStats.xlsx", index=False)
-    print("9 Row Case Pitching Stats:", pdDF9)
 
 
 if testRoster1Info:
-    import pandas as pd
+
     pdDFRoster = pd.DataFrame(rosterInfoOCR(testRosPg1, testRosPg2, testRosPg3, testRosPg4))
     pdDFRoster.to_excel("C:\\GithubRepos\\TestData\\testRosterPage.xlsx", index=False)
     print("Roster1 Exported")

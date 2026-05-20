@@ -1,6 +1,8 @@
 #ocr_parsers.py
-from ocr_core import extractOCRdata, combineTextOCR, averageConfidence
-from SMB4_OCR import manualReview
+from ocr_core import extractOCRdata, combineTextOCR, averageConfidence, retryOCR
+from ocr_review import manualReview
+import ocr_configs
+import re
 
 
 def ocrNumbersWithConfidence(roi, config, minConfidence=1):
@@ -13,12 +15,12 @@ def ocrNumbersWithConfidence(roi, config, minConfidence=1):
     combinedText = combineTextOCR(validTexts)
     
     avgConfidence = averageConfidence(validConfidences)
-    reviewNeeded = (len(validTexts) == 0 or averageConfidence < minConfidence)
+    reviewNeeded = (len(validTexts) == 0 or avgConfidence < minConfidence)
     
 
     if reviewNeeded:
         combinedText = manualReview(roi, validTexts, validConfidences)    
-    return combinedText, averageConfidence
+    return combinedText, avgConfidence
 
 def ocrWordsWithConfidence(roi, config, minConfidence=20):
     texts, confidences = extractOCRdata(roi, config)
