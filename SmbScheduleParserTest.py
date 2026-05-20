@@ -2,6 +2,7 @@ from statistics import mode
 import cv2
 import pytesseract
 import numpy as np
+import pandas as pd
 pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
 
 import os
@@ -12,9 +13,10 @@ testDetectRows = False
 testBattingStats = False
 testPitchingStats = False
 showRosterPages = False
-testRoster1Info = True
-testRoster2Info = True
+testRoster1Info = False
+testRoster2Info = False
 generateCoords = False
+testSchedule = True
 
 def capFrame(videoPath, timestampSecs = 0):
     cap = cv2.VideoCapture(videoPath)
@@ -46,6 +48,7 @@ from DetectRowCount import detectRowCount
 videoPathBaseStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsBaseTestCase.mp4"
 videoPathExtremeStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsExtremeTestCase.mp4"
 videoPathRoster = r"C:\GithubRepos\SMB4-Data-Parser\AttributesTestCaseFranchise.mp4"
+videoPathBaseSchedule = r"C:\GithubRepos\SMB4-Data-Parser\ScheduleBaseTestCase.mp4"
 test9Rows = capFrame(videoPathBaseStats, 3)
 test14Rows = capFrame(videoPathBaseStats, 6)
 test20Rows = capFrame(videoPathBaseStats)
@@ -101,7 +104,7 @@ if testRoster1Info:
     print("Roster1 Exported")
 
 if testRoster2Info:
-    import pandas as pd
+
     pdDFRoster = pd.DataFrame(rosterInfoOCR(test2RosPg1, test2RosPg2, test2RosPg3, test2RosPg4))
     pdDFRoster.to_excel("C:\\GithubRepos\\TestData\\test2RosterPage.xlsx", index=False)
     print("Roster2 Exported")
@@ -127,16 +130,13 @@ if generateCoords:
     cv2.destroyAllWindows()
 
     print(clickedPoint)
+ 
 
 
-# getWindowCoords(test20Rows)   
-
-# videoPathBase = "SMB4_Schedule_Test.mp4"
-# videoPathExtreme = "ScheduleExtremeTestCase.mp4"
-# frameBase = capFirstFrame(videoPathBase)
-# frameExtreme = capFirstFrame(videoPathExtreme)
-
-# scheduleOCR(frameBase)
+if testSchedule:
+    frameBase = capFrame(videoPathBaseSchedule)
+    pdDFSchedule =  pd.DataFrame(scheduleOCR(frameBase))
+    print(pdDFSchedule)
 
 
 cv2.waitKey(0)

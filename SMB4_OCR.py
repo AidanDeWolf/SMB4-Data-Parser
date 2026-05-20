@@ -2,6 +2,7 @@
 import cv2
 import pytesseract
 import ocr_configs
+import re
 
 def extractOCRdata(roi, config):
     """
@@ -148,23 +149,7 @@ def ocrNumbersWithConfidence(roi, config, minConfidence=1):
     return combinedText, averageConfidence
 
 def ocrWordsWithConfidence(roi, config, minConfidence=20):
-    import pytesseract
-
-    data = pytesseract.image_to_data(roi, config = config, output_type=pytesseract.Output.DICT)
-    texts = []
-    confidences = []
-
-    for i in range(len(data["text"])):
-        text = data["text"][i].strip()
-        if text == "":
-            continue
-        
-        confidence = int(data["conf"][i])
-        if confidence < 0:
-            continue
-
-        texts.append(text)
-        confidences.append(confidence)
+    texts, confidences = extractOCRdata(roi, config)
 
     if len(texts) == 0:
         combined = manualReview(roi, texts, confidences)
@@ -173,8 +158,7 @@ def ocrWordsWithConfidence(roi, config, minConfidence=20):
     #Combine multi-word outputs (names)
     combinedText = " ".join(texts)
     
-    
-    avgConfidence = sum(confidences) / len(confidences)
+    avgConfidence = averageConfidence(confidences)
 
     if combinedText == "CC" and (config == ocr_configs.priPosConfig or config == ocr_configs.secPosConfig):
         return "C", avgConfidence
@@ -186,23 +170,9 @@ def ocrWordsWithConfidence(roi, config, minConfidence=20):
     return combinedText, avgConfidence
     
 def ocrHandednessWithConfidence(roi, config, minConfidence=20):
-    import pytesseract
-    data = pytesseract.image_to_data(roi, config=config, output_type = pytesseract.Output.DICT)
+    
     VALID = {"R", "L", "S"}
-    texts =[]
-    confidences=[]
-    data = pytesseract.image_to_data(roi, config=config, output_type=pytesseract.Output.DICT)
-
-    for i in range(len(data["text"])):
-        text = data ["text"][i].strip()
-
-        if text == "":
-            continue
-        confidence = int(data["conf"][i])
-        if confidence<0:
-            continue
-        texts.append(text.upper())
-        confidences.append(confidence)
+    texts, confidences = extractOCRdata(roi, config)
 
     if len(texts) == 0:
            combined = manualReview(roi, texts, confidences)
@@ -216,27 +186,12 @@ def ocrHandednessWithConfidence(roi, config, minConfidence=20):
         return combined, -1
     from collections import Counter
     best = Counter(filtered).most_common(1)[0][0]
-    avgConfidence = sum(confidences)/len(confidences)
+    avgConfidence = averageConfidence(confidences)
 
     return best, avgConfidence
 
 def ocrTraitsWithConfidence(roi, config, minConfidence = 20):
-    import pytesseract
-    import re
-    data = pytesseract.image_to_data(roi, config=config, output_type=pytesseract.Output.DICT)
-    texts = []
-    confidences = []
-    for i in range(len(data["text"])):
-        text = data["text"][i].strip()
-
-        if text == "":
-            continue
-        confidence = int(data["conf"][i])
-
-        if confidence <0:
-            continue
-        texts.append(text)
-        confidences.append(confidence) 
+    texts, confidences = extractOCRdata(roi, config)
     if len(texts)== 0:
         return "", 100
     
@@ -262,25 +217,7 @@ def ocrTraitsWithConfidence(roi, config, minConfidence = 20):
     return combinedText, avgConfidence
 
 def ocrSalaryWithConfidence(roi, config, minConfidence = 20):
-    import pytesseract
-    import re
-    data = pytesseract.image_to_data(roi, config=config, output_type=pytesseract.Output.DICT)
-    texts = []
-    confidences = []
-
-    for i in range(len(data["text"])):
-        text = data["text"][i].strip()
-
-        if text == "":
-            continue
-
-        confidence = int(data["conf"][i])
-
-        if confidence < 0:
-            continue
-
-        texts.append(text)
-        confidences.append(confidence)
+    texts, confidences = extractOCRdata(roi, config)
 
     if len(texts) ==0:
         return 0, 100
@@ -288,15 +225,17 @@ def ocrSalaryWithConfidence(roi, config, minConfidence = 20):
     combinedText = "".join(texts).lower().strip()
     match = re.search(r"\d+(\.\d+)?", combinedText)
 
+    avgConfidence = averageConfidence(confidences)
+
     if not match:
-        return 0, sum(confidences) / len(confidences)
+        return 0, avgConfidence
     
     try:
         value = float(match.group(0))
     except:
         return 0, 0
     
-    avgConfidence = sum(confidences) / len(confidences)
+    
 
     reviewNeeded = (avgConfidence < minConfidence or value>35)
     if reviewNeeded:
