@@ -7,6 +7,10 @@ __pycache__/
 *.mp4
 *.avi
 
+#Folders
+mp4/
+png/
+
 # C extensions
 *.so
 

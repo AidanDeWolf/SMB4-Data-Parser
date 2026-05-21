@@ -13,11 +13,13 @@ testDetectRows = False
 testBattingStats = False
 testPitchingStats = False
 showRosterPages = False
-testRoster1Info = True
+testRoster1Info = False
 testRoster2Info = False
 generateCoords = False
 testSchedule = False
 testSznRosterInfo = False
+savePNGs = False
+
 
 def capFrame(videoPath, timestampSecs = 0):
     cap = cv2.VideoCapture(videoPath)
@@ -27,6 +29,8 @@ def capFrame(videoPath, timestampSecs = 0):
         print(f"Failed to read video: {videoPath}")
         return None
     return frame
+
+
 
 # Needs to be worked on
 def videoCapture(videoPath):
@@ -46,11 +50,14 @@ from DetectRowCount import detectRowCount
 
 
 
-videoPathBaseStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsBaseTestCase.mp4"
-videoPathExtremeStats = r"C:\GithubRepos\SMB4-Data-Parser\StatsExtremeTestCase.mp4"
-videoPathRoster = r"C:\GithubRepos\SMB4-Data-Parser\AttributesTestCaseFranchise.mp4"
-videoPathSznRoster = r"C:\GithubRepos\SMB4-Data-Parser\AttributesTestCaseSeason.mp4"
-videoPathBaseSchedule = r"C:\GithubRepos\SMB4-Data-Parser\ScheduleBaseTestCase.mp4"
+videoPathBaseStats = r"C:\GithubRepos\SMB4-Data-Parser\mp4\StatsBaseTestCase.mp4"
+videoPathExtremeStats = r"C:\GithubRepos\SMB4-Data-Parser\mp4\StatsExtremeTestCase.mp4"
+videoPathRoster = r"C:\GithubRepos\SMB4-Data-Parser\mp4\AttributesTestCaseFranchise.mp4"
+videoPathSznRoster = r"C:\GithubRepos\SMB4-Data-Parser\mp4\AttributesTestCaseSeason.mp4"
+videoPathBaseSchedule = r"C:\GithubRepos\SMB4-Data-Parser\mp4\ScheduleBaseTestCase.mp4"
+
+testSchedulePg1 = capFrame(videoPathBaseSchedule,0)
+testSchedulePg2 = capFrame(videoPathBaseSchedule,12)
 test9Rows = capFrame(videoPathBaseStats, 3)
 test14Rows = capFrame(videoPathBaseStats, 6)
 test20Rows = capFrame(videoPathBaseStats)
@@ -69,6 +76,35 @@ sznRosPg1 = capFrame(videoPathSznRoster, 8)
 sznRosPg2 = capFrame(videoPathSznRoster, 9)
 sznRosPg3 = capFrame(videoPathSznRoster, 11)
 sznRosPg4 = capFrame(videoPathSznRoster, 13)
+
+#getWindowCoords(testRosPg1)
+
+if savePNGs:
+    out_dir = r"C:\GithubRepos\SMB4-Data-Parser\png"
+
+    cv2.imwrite(out_dir + r"\franchiseRos1.png", test2RosPg1)
+    cv2.imwrite(out_dir + r"\franchiseRos2.png", test2RosPg2)
+    cv2.imwrite(out_dir + r"\franchiseRos3.png", test2RosPg3)
+    cv2.imwrite(out_dir + r"\franchiseRos4.png", test2RosPg4)
+
+    cv2.imwrite(out_dir + r"\sznRos1.png", sznRosPg1)
+    cv2.imwrite(out_dir + r"\sznRos2.png", sznRosPg2)
+    cv2.imwrite(out_dir + r"\sznRos3.png", sznRosPg3)
+    cv2.imwrite(out_dir + r"\sznRos4.png", sznRosPg4)
+
+    cv2.imwrite(out_dir + r"\batStats.png", test22Rows)
+
+    cv2.imwrite(out_dir + r"\scheduleFirst.png", testSchedulePg1)
+    cv2.imwrite(out_dir + r"\scheduleLast.png", testSchedulePg2)
+
+    cv2.imwrite(out_dir + r"\pitchStats.png", test9Rows)
+
+
+centerScheduleX = 911
+centerScheduleY = 194
+xBuffer = 720
+yBuffer = 22
+
 
 
 
@@ -152,28 +188,3 @@ cv2.waitKey(0)
 cv2.destroyAllWindows()
 print("Script Finished")
 
-
-
-
-""" battingStats.append({
-            "name": name,
-            "games": games,
-            "atBats": atBats,
-            "hits": hits,
-            "homeRuns": homeRuns,
-            "rbi": rbi,
-            "runs": runs,
-            "totalBases": totalBases,
-            "doubles": doubles,
-            "triples": triples,
-            "walks": walks,
-            "strikeouts": battingK,
-            "stolenBases": sb,
-            "caughtStealing": cs,
-            "hitByPitch": hbp,
-            "sacrificeHits": sac,
-            "sacrificeFlies": sf,
-            "errors": errors,
-            "passedBalls": ""
-        })
-        battingStats = batStatsCheck(battingStats) """
